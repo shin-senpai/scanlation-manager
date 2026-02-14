@@ -1,9 +1,11 @@
-cmake_minimum_required (VERSION 3.15)
+cmake_minimum_required (VERSION 3.28)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(BOT_NAME "templatebot")
+set(BOT_NAME "scanlation-manager")
 
-project(${BOT_NAME})
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+project(${BOT_NAME} LANGUAGES C CXX)
 aux_source_directory("src" coresrc)
 add_executable(${BOT_NAME} ${coresrc})
 
@@ -12,13 +14,15 @@ string(ASCII 27 Esc)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set_target_properties(${BOT_NAME} PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
+	CXX_EXTENSIONS OFF
 )
 
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 find_package(DPP)
+find_package(CURL REQUIRED)
 if(APPLE)
 	if(CMAKE_APPLE_SILICON_PROCESSOR)
 		set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl")
@@ -37,6 +41,7 @@ endif()
 target_include_directories(${BOT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OPENSSL_INCLUDE_DIR}
+	${CURL_INCLUDE_DIRS}
 )
 
 target_link_libraries(${BOT_NAME}
@@ -44,6 +49,7 @@ target_link_libraries(${BOT_NAME}
     ${CMAKE_THREAD_LIBS_INIT}
     ${OPENSSL_CRYPTO_LIBRARY} 
     ${OPENSSL_SSL_LIBRARY}
+	${CURL_LIBRARIES}
 )
 
 if (DPP_FOUND)

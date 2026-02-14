@@ -1,4 +1,6 @@
-#include <templatebot/templatebot.h>
+#include "main.h"
+#include "HttpUtils.h"
+#include "DiscordUtils.h"
 
 /* When you invite the bot, be sure to invite it with the
  * scopes 'bot' and 'applications.commands', e.g.
@@ -10,33 +12,42 @@ using json = nlohmann::json;
 int main(int argc, char const *argv[]) {
     json configdocument;
     std::ifstream configfile("../config.json");
+    if (!configfile.is_open()) {
+        std::cerr << "Error: Could not open config.json. Check the file path!" << std::endl;
+        return 1; 
+    }
     configfile >> configdocument;
 
-    const std::string BOT_TOKEN = configdocument["token"];
+    const std::string DISCORD_BOT_TOKEN = configdocument["discord_bot_token"];
+    const std::string GSHEET_AUTH_TOKEN = configdocument["gsheet_auth_token"];
+    const std::string GSHEET_PRIV_API_URL = configdocument["gsheet_priv_api_url"];
+    
+    // --- GOOGLE SHEETS API TEST START ---
+    std::cout << "[Google Sheets] Testing connection..." << std::endl;
 
-    /* Set up the bot */
-    dpp::cluster bot(BOT_TOKEN);
+    // 1. Construct the Payload
+    json payload;
+    payload["auth"] = GSHEET_AUTH_TOKEN;
+    payload["action"] = "info"; // Simple action to check connectivity
+    // payload["spreadsheet_id"] = "..."; // Optional: Only if not hardcoded in Script
 
-    /* Output simple log messages to stdout */
-    bot.on_log(dpp::utility::cout_logger());
+    // 2. Prepare Request
+    std::string response_buffer;
+    std::vector<std::string> headers = { "Content-Type: application/json" };
+    
+    // 3. Send POST Request
+    // Note: We use payload.dump() to convert the JSON object to a std::string
+    int http_code = httpPost(GSHEET_PRIV_API_URL, headers, payload.dump(), response_buffer);
 
-    /* Handle slash command */
-    bot.on_slashcommand([](const dpp::slashcommand_t& event) {
-         if (event.command.get_command_name() == "ping") {
-            event.reply("Pong!");
-        }
-    });
-
-    /* Register slash command here in on_ready */
-    bot.on_ready([&bot](const dpp::ready_t& event) {
-        /* Wrap command registration in run_once to make sure it doesn't run on every full reconnection */
-        if (dpp::run_once<struct register_bot_commands>()) {
-            bot.global_command_create(dpp::slashcommand("ping", "Ping pong!", bot.me.id));
-        }
-    });
-
-    /* Start the bot */
-    bot.start(dpp::st_wait);
+    // 4. Output Result
+    if (http_code == 200) {
+        std::cout << "[Google Sheets] Success! Response:\n" << response_buffer << std::endl;
+    } else {
+        std::cerr << "[Google Sheets] Failed. HTTP Code: " << http_code << "\nResponse: " << response_buffer << std::endl;
+    }
+    // --- GOOGLE SHEETS API TEST END ---
+    
+    initBot(DISCORD_BOT_TOKEN);
 
     return 0;
 }

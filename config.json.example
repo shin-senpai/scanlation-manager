@@ -1,0 +1,6 @@
+{
+    "discord_bot_token": "",
+    "gsheet_auth_token": "",
+    "gsheet_priv_api_url": "",
+    "work_progress_channel": ""
+}

@@ -72,3 +72,17 @@ else()
 		message(FATAL_ERROR "Failed to find the git executable. Can't update the D++ submodule.")
 	endif()
 endif()
+
+set(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config.json")
+set(CONFIG_DEST "${CMAKE_CURRENT_BINARY_DIR}/config.json")
+
+if(EXISTS ${CONFIG_FILE})
+    add_custom_command(
+        TARGET ${BOT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CONFIG_FILE}" "${CONFIG_DEST}"
+        COMMENT "Copying config.json to build directory..."
+    )
+else()
+    message(STATUS "config.json not found in source directory, skipping copy.")
+endif()

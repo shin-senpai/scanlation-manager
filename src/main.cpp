@@ -1,4 +1,4 @@
-#include "main.h"
+#include "Config.h"
 #include "HttpUtils.h"
 #include "DiscordUtils.h"
 
@@ -10,17 +10,13 @@
 using json = nlohmann::json;
 
 int main(int argc, char const *argv[]) {
-    json configdocument;
-    std::ifstream configfile("../config.json");
-    if (!configfile.is_open()) {
-        std::cerr << "Error: Could not open config.json. Check the file path!" << std::endl;
-        return 1; 
-    }
-    configfile >> configdocument;
+    CurlGlobalManager curl_lifecycle;
 
-    const std::string DISCORD_BOT_TOKEN = configdocument["discord_bot_token"];
-    const std::string GSHEET_AUTH_TOKEN = configdocument["gsheet_auth_token"];
-    const std::string GSHEET_PRIV_API_URL = configdocument["gsheet_priv_api_url"];
+    ConfigManager config("config.json");
+
+    const std::string DISCORD_BOT_TOKEN = config.get<std::string>("discord_bot_token");
+    const std::string GSHEET_AUTH_TOKEN = config.get<std::string>("gsheet_auth_token");
+    const std::string GSHEET_PRIV_API_URL = config.get<std::string>("gsheet_priv_api_url");
     
     // --- GOOGLE SHEETS API TEST START ---
     std::cout << "[Google Sheets] Testing connection..." << std::endl;
@@ -47,7 +43,8 @@ int main(int argc, char const *argv[]) {
     }
     // --- GOOGLE SHEETS API TEST END ---
     
-    initBot(DISCORD_BOT_TOKEN);
-
+    Bot scanManager(DISCORD_BOT_TOKEN, config);
+    scanManager.start();
+    
     return 0;
 }

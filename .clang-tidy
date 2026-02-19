@@ -1,0 +1,34 @@
+---
+Checks: 'readability-identifier-naming'
+CheckOptions:
+  # Classes / Structs
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase   # PascalCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase   # PascalCase
+
+  # Functions
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack   # camelCase
+  - key: readability-identifier-naming.MethodCase
+    value: camelBack   # camelCase
+
+  # Variables
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case  # snake_case
+  - key: readability-identifier-naming.PrivateMemberPrefix
+    value: 'm_'       # m_ prefix for private members
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: lower_case  # snake_case after m_
+
+  # Public / local member variables
+  - key: readability-identifier-naming.PublicMemberCase
+    value: lower_case  # snake_case
+
+  # Constants
+  - key: readability-identifier-naming.ConstantCase
+    value: lower_case
+
+  # Other options
+  - key: readability-identifier-naming.IgnoreMainLikeFunctions
+    value: '1'         # ignores 'main'

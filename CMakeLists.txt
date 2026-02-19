@@ -6,7 +6,7 @@ set(BOT_NAME "scanlation-manager")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 project(${BOT_NAME} LANGUAGES C CXX)
-aux_source_directory("src" coresrc)
+file(GLOB_RECURSE coresrc CONFIGURE_DEPENDS "src/*.cpp")
 add_executable(${BOT_NAME} ${coresrc})
 
 string(ASCII 27 Esc)

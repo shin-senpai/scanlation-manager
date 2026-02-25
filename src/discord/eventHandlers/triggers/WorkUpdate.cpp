@@ -4,7 +4,12 @@
 #include "discord/DiscordUtils.h"
 
 // Standard Includes
+#include <cstddef>
+#include <cstdint>
+#include <dpp/snowflake.h>
+#include <string>
 #include <string_view>
+#include <charconv>
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
@@ -15,6 +20,7 @@ struct WorkUpdate {
   std::string chapter;
   std::string task;
   std::string next_role;
+  std::string series_channel_name;
 };
 
 static void normalize(std::string &str) {
@@ -23,14 +29,55 @@ static void normalize(std::string &str) {
   str.erase(new_end, str.end());
 }
 
+//Extract channel id channel mentions. Only supports mentions aka <#[snowflake]>
+static bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
+
+  size_t start = sv.find("<#");
+  if (start == std::string_view::npos) {
+    return false;
+  }
+
+  size_t end = sv.find('>', start);
+  if (end == std::string_view::npos) {
+    return false;
+  }
+
+  // The actual ID starts 2 characters after the '#'
+  start += 2;
+  std::string_view id_str = sv.substr(start, end - start);
+
+  uint64_t val = 0;
+  auto [ptr, ec] = std::from_chars(id_str.data(), id_str.data() + id_str.size(), val);
+
+  if (ec == std::errc()) {
+       channel_id = val;
+       return true;
+  }
+
+  return false;
+}
+
+static bool extractChannelName(std::string_view sv, WorkUpdate &update){
+  
+  dpp::snowflake channel_id;
+  if(!extractChannelId(sv, channel_id)){
+    return false;
+  }
+
+  dpp::channel* channel = dpp::find_channel(channel_id);
+  if(channel != nullptr) {
+    update.series_channel_name = channel->name;
+    return true;
+  }
+
+  return false;
+}
+
 void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
   std::string content = event.msg.content;
   normalize(content);
 
-    
-
-  if (std::count(content.begin(), content.end(), '|') < 3)
-    return;
+  if (std::count(content.begin(), content.end(), '|') < 3) return;
 
   WorkUpdate update;
   std::string_view sv(content);
@@ -59,31 +106,22 @@ void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
       update.next_role = segment;
       break;
     }
-    if (end == std::string_view::npos)
-      break;
+
+    if (end == std::string_view::npos) break;
+
     start = end + 1;
   }
 
+  if(!extractChannelName(update.series_channel, update)) {
+    update.series_channel_name = "null";
+  }
+
   std::string response = "Work Update\nStaff Name: " + update.staff_name +
-                         "\nSeries: " + update.series_channel +
+                         "\nSeries Channel: " + update.series_channel +
+                         "\nSeries Channel Name: " + update.series_channel_name +
                          "\nChapter: " + update.chapter +
                          "\nTask: " + update.task +
                          "\nNext Role: " + update.next_role;
 
   event.reply(response);
-
-  // std::stringstream ss(content);
-  // std::string segment;
-  // std::vector<std::string> parts;
-
-  // while(std::getline(ss, segment, '|')) {
-  //     parts.push_back(segment);
-  // }
-
-  // if(parts.size() == 4){
-  //     update.staff_name = parts[0];
-  //     update.series_channel = parts[1];
-  //     update.chapter = parts[2];
-  //     update.next_role = parts[3];
-  // }
 }

@@ -75,7 +75,6 @@ public:
   CurlWrapper(const CurlWrapper &) = delete;
 };
 
-// Callback function to write received data into a std::string
 static size_t writeCallback(void *contents, size_t size, size_t nmemb,
                             void *userp) {
   (static_cast<std::string *>(static_cast<void *>(userp)))

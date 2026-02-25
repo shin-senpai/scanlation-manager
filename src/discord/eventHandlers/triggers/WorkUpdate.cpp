@@ -19,13 +19,13 @@ struct WorkUpdate {
   std::string series_channel;
   std::string chapter;
   std::string task;
-  std::string next_role;
+  std::string next_role = "";
   std::string series_channel_name;
 };
 
 static void normalize(std::string &str) {
   auto new_end = std::remove_if(
-      str.begin(), str.end(), [](unsigned char x) { return std::isspace(x); });
+      str.begin(), str.end(), [](unsigned char x) { return std::isspace(x) || x < 32 || x > 126; });
   str.erase(new_end, str.end());
 }
 
@@ -76,8 +76,17 @@ static bool extractChannelName(std::string_view sv, WorkUpdate &update){
 void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
   std::string content = event.msg.content;
   normalize(content);
-
-  if (std::count(content.begin(), content.end(), '|') < 3) return;
+  
+  bool has_next_role;
+  if (std::count(content.begin(), content.end(), '|') == 4) {
+    has_next_role = true;
+  }
+  else if (std::count(content.begin(), content.end(), '|') == 3) {
+    has_next_role = false;
+  }
+  else{
+    return;
+  }
 
   WorkUpdate update;
   std::string_view sv(content);
@@ -103,7 +112,9 @@ void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
       update.task = segment;
       break;
     case 4:
-      update.next_role = segment;
+      if(has_next_role) {
+        update.next_role = segment;
+      }
       break;
     }
 

@@ -95,8 +95,9 @@ Bot::Bot(const std::string &DISCORD_BOT_TOKEN, ConfigManager &cfg)
 void Bot::start() { core.start(dpp::st_wait); }
 
 void Bot::fillCommandMap() {
-  commands["ping"] = {"Ping Pong",
-                      [this](const dpp::slashcommand_t &e) { commandPing(e); }};
+  commands["ping"] = {
+      "Ping Pong",
+      [this](const dpp::slashcommand_t &e) { commandPing(e); }};
 
   commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",

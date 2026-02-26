@@ -13,9 +13,9 @@
 class ConfigManager;
 class Bot {
 private:
-  dpp::cluster core;
-  ConfigManager &config;
-  dpp::snowflake work_progress_channel{};
+  dpp::cluster m_core;
+  ConfigManager &m_config;
+  dpp::snowflake m_work_progress_channel{};
 
   struct CommandInfo {
     std::string description;
@@ -29,10 +29,10 @@ private:
     std::function<void(const dpp::message_create_t &)> handler;
   };
 
-  std::unordered_map<std::string, CommandInfo> commands;
-  std::vector<TriggerInfo> triggers;
+  std::unordered_map<std::string, CommandInfo> m_commands;
+  std::vector<TriggerInfo> m_triggers;
 
-  const dpp::snowflake GUILD_ID = 1254062114159726693;
+  const dpp::snowflake guild_id = 1254062114159726693;
 
 public:
   Bot(const std::string &token, ConfigManager &cfg);

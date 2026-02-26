@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "HttpUtils.h"
+#include "utils/HttpUtils.h"
 
 // User Defined Includes
 
@@ -13,16 +13,12 @@
 #include <curl/curl.h>
 
 CurlGlobalManager::CurlGlobalManager() {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
+  curl_global_init(CURL_GLOBAL_DEFAULT);
 }
 
-CurlGlobalManager::~CurlGlobalManager() {
-    curl_global_cleanup();
-}
+CurlGlobalManager::~CurlGlobalManager() { curl_global_cleanup(); }
 
-void CurlGlobalManager::curlManagerInit() {
-    static CurlGlobalManager instance;
-}
+void CurlGlobalManager::curlManagerInit() { static CurlGlobalManager instance; }
 
 class CurlWrapper {
 private:
@@ -75,8 +71,7 @@ public:
   CurlWrapper(const CurlWrapper &) = delete;
 };
 
-static size_t writeCallback(void *contents, size_t size, size_t nmemb,
-                            void *userp) {
+static size_t writeCallback(void *contents, size_t size, size_t nmemb, void *userp) {
   (static_cast<std::string *>(static_cast<void *>(userp)))
       ->append(static_cast<char *>(static_cast<void *>(contents)),
                size * nmemb);
@@ -85,7 +80,6 @@ static size_t writeCallback(void *contents, size_t size, size_t nmemb,
 
 // URL Encodes all elements of a passed vector
 std::vector<std::string> urlEncode(const std::vector<std::string> &unencoded_data) {
-
   CurlWrapper wrapper;
   std::vector<std::string> encoded_data{};
   for (const std::string &str : unencoded_data) {
@@ -99,7 +93,7 @@ static int executeRequest(CurlWrapper &wrapper, const std::string &url,
   // curl_easy_setopt(wrapper.getCurl(), CURLOPT_VERBOSE, 1L); - Uncomment this for verbose logs
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_URL, url.c_str());
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_FOLLOWLOCATION, 1L);
-  curl_easy_setopt(wrapper.getCurl(), CURLOPT_USERAGENT,"scanlation-manager/0.0.1");
+  curl_easy_setopt(wrapper.getCurl(), CURLOPT_USERAGENT, "scanlation-manager/0.0.1");
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_HTTPHEADER, wrapper.getHeaders());
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_WRITEFUNCTION, writeCallback);
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_WRITEDATA, &read_buffer);
@@ -133,8 +127,7 @@ int httpPost(const std::string &url, const std::vector<std::string> &headers,
 
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_POST, 1L);
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_POSTFIELDS, post_data.c_str());
-  curl_easy_setopt(wrapper.getCurl(), CURLOPT_POSTFIELDSIZE,
-                   static_cast<long>(post_data.length()));
+  curl_easy_setopt(wrapper.getCurl(), CURLOPT_POSTFIELDSIZE, static_cast<long>(post_data.length()));
 
   return executeRequest(wrapper, url, read_buffer);
 }

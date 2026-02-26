@@ -1,7 +1,7 @@
 // Associated Header Include
 
 // User Defined Includes
-#include "discord/DiscordUtils.h"
+#include "discord/Bot.h"
 
 // Standard Includes
 

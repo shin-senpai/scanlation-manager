@@ -1,7 +1,7 @@
 // Associated Header Include
 
 // User Defined Includes
-#include "discord/DiscordUtils.h"
+#include "discord/Bot.h"
 
 // Standard Includes
 #include <cstddef>
@@ -17,10 +17,10 @@
 struct WorkUpdate {
   std::string staff_name;
   std::string series_channel;
+  std::string series_channel_name;
   std::string chapter;
   std::string task;
   std::string next_role = "";
-  std::string series_channel_name;
 };
 
 static void normalize(std::string &str) {
@@ -42,7 +42,7 @@ static bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
     return false;
   }
 
-  // The actual ID starts 2 characters after the '#'
+  // The actual ID starts 2 characters after the '<'
   start += 2;
   std::string_view id_str = sv.substr(start, end - start);
 
@@ -124,7 +124,7 @@ void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
   }
 
   if(!extractChannelName(update.series_channel, update)) {
-    update.series_channel_name = "null";
+    update.series_channel_name = "";
   }
 
   std::string response = "Work Update\nStaff Name: " + update.staff_name +

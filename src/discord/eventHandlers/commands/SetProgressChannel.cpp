@@ -7,6 +7,7 @@
 // Standard Includes
 
 // Third Party Includes
+#include <dpp/dispatcher.h>
 
 void Bot::commandSetProgressChannel(const dpp::slashcommand_t &event) {
   dpp::snowflake channel_id = std::get<dpp::snowflake>(event.get_parameter("channel"));

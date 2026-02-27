@@ -1,8 +1,8 @@
 // Associated Header Include
 
 // User Defined Includes
-#include "utils/ConfigManager.h"
-#include "discord/Bot.h"
+#include "utils/ConfigManager.hpp"
+#include "discord/Bot.hpp"
 
 // Standard Includes
 

@@ -1,8 +1,8 @@
 // Associated Header Include
 
 // User Defined Includes
-#include "discord/Bot.h"
-#include "models/WorkUpdate.h"
+#include "discord/Bot.hpp"
+#include "models/WorkUpdate.hpp"
 
 // Standard Includes
 #include <cstddef>

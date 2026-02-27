@@ -2,6 +2,7 @@
 
 // User Defined Includes
 #include "discord/Bot.h"
+#include "models/WorkUpdate.h"
 
 // Standard Includes
 #include <cstddef>
@@ -13,15 +14,6 @@
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
-
-struct WorkUpdate {
-  std::string staff_name;
-  std::string series_channel;
-  std::string series_channel_name;
-  std::string chapter;
-  std::string task;
-  std::string next_role = "";
-};
 
 static void normalize(std::string &str) {
   auto new_end = std::remove_if(

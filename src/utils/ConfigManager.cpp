@@ -13,7 +13,8 @@ ConfigManager::ConfigManager(const std::string &file_path) : m_path(file_path) {
   load();
 }
 
-// Save is an internal method, and can/should only be called while holding the mutex
+// Save is an internal method, and can/should only be called while holding the
+// mutex
 void ConfigManager::save() {
   std::ofstream f(m_path);
   f << m_data.dump(4);

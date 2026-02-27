@@ -1,76 +1,56 @@
 cmake_minimum_required (VERSION 3.28)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(BOT_NAME "scanlation-manager")
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-project(${BOT_NAME} LANGUAGES C CXX)
+project(scanlation-manager LANGUAGES C CXX)
 file(GLOB_RECURSE coresrc CONFIGURE_DEPENDS "src/*.cpp")
-add_executable(${BOT_NAME} ${coresrc})
+add_executable(${PROJECT_NAME} ${coresrc})
 
-string(ASCII 27 Esc)
+set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
-set_target_properties(${BOT_NAME} PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-	CXX_EXTENSIONS OFF
-)
-
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
-find_package(DPP)
 find_package(CURL REQUIRED)
-if(APPLE)
-	if(CMAKE_APPLE_SILICON_PROCESSOR)
-		set(OPENSSL_ROOT_DIR "/opt/homebrew/opt/openssl")
-	else()
-		set(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
-	endif()
-	find_package(OpenSSL REQUIRED)
-else()
-	find_package(OpenSSL REQUIRED)
-endif()
+find_package(nlohmann_json REQUIRED)
+find_package(DPP)
 
-if(NOT CMAKE_SYSTEM_NAME STREQUAL Windows)
-	set(DL_LIBRARY dl)
-endif()
-
-target_include_directories(${BOT_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${OPENSSL_INCLUDE_DIR}
-	${CURL_INCLUDE_DIRS}
+target_include_directories(${PROJECT_NAME}
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${BOT_NAME}
-    ${DL_LIBRARY}
-    ${CMAKE_THREAD_LIBS_INIT}
-    ${OPENSSL_CRYPTO_LIBRARY} 
-    ${OPENSSL_SSL_LIBRARY}
-	${CURL_LIBRARIES}
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        Threads::Threads
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        CURL::libcurl
+        nlohmann_json::nlohmann_json
 )
 
 if (DPP_FOUND)
-    target_link_libraries(${BOT_NAME} ${DPP_LIBRARIES})
-    target_include_directories(${BOT_NAME} PUBLIC ${DPP_INCLUDE_DIR})
+    target_link_libraries(${PROJECT_NAME} PRIVATE dpp)
 else()
-	find_package(Git)
-	message(WARNING "Could not find DPP install. Building from source instead.")
-	if (GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
-		execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init
-				WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-				RESULT_VARIABLE RESULT)
-		if (NOT RESULT EQUAL 0)
-			message(FATAL_ERROR "Failed to update the D++ submodule. Code: ${RESULT}.")
-		else()
-			add_subdirectory(DPP)
-			target_link_libraries(${BOT_NAME} dpp)
-		endif()
-	else()
-		message(FATAL_ERROR "Failed to find the git executable. Can't update the D++ submodule.")
-	endif()
+    find_package(Git REQUIRED)
+
+    message(WARNING "Could not find DPP install. Building from source instead.")
+
+    if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} submodule update --init
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            RESULT_VARIABLE RESULT
+        )
+
+        if (NOT RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to update the D++ submodule.")
+        endif()
+
+        add_subdirectory(DPP)
+        target_link_libraries(${PROJECT_NAME} PRIVATE dpp)
+    else()
+        message(FATAL_ERROR "Failed to find the git executable. Can't update the D++ submodule.")
+    endif()
 endif()
 
 set(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config.json")
@@ -78,8 +58,7 @@ set(CONFIG_DEST "${CMAKE_CURRENT_BINARY_DIR}/config.json")
 
 if(EXISTS ${CONFIG_FILE})
     add_custom_command(
-        TARGET ${BOT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}"
+        TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CONFIG_FILE}" "${CONFIG_DEST}"
         COMMENT "Copying config.json to build directory..."
     )

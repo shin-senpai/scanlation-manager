@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 // Third Party Includes
+#include <nlohmann/json.hpp>
 
 ConfigManager::ConfigManager(const std::string &file_path) : m_path(file_path) {
   load();

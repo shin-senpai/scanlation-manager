@@ -7,7 +7,7 @@
 #include <vector>
 
 // Third Party Includes
-#include <dpp/nlohmann/json.hpp>
+#include <nlohmann/json.hpp>
 
 class ConfigManager {
 private:

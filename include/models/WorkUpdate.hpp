@@ -1,4 +1,8 @@
+// WorkUpdate.h - contains the definition for the WorkUpdate struct
+
 #pragma once
+
+// Standard Includes
 #include <string>
 
 struct WorkUpdate {

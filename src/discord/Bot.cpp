@@ -16,15 +16,22 @@
 #include <dpp/dpp.h>
 #include <dpp/snowflake.h>
 
+// Triggers
+#include "discord/eventHandlers/triggers/WorkUpdate.hpp"
+
+// Commands
+#include "discord/eventHandlers/commands/SetProgressChannel.hpp"
+#include "discord/eventHandlers/commands/Ping.hpp"
+
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
       "Ping Pong",
-      [this](const dpp::slashcommand_t &e) { commandPing(e); }
+      [this](const dpp::slashcommand_t &e) { Commands::ping(e); }
     };
 
   m_commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",
-      [this](const dpp::slashcommand_t &e) { commandSetProgressChannel(e); },
+      [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
       {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel",true).add_channel_type(dpp::CHANNEL_TEXT)}
     };
 }
@@ -33,7 +40,7 @@ void Bot::fillTriggerList() {
   m_triggers.emplace_back(
     "Work Progress",
     [this](const dpp::message_create_t &e){return e.msg.channel_id == m_work_progress_channel;},
-    [this](const dpp::message_create_t &e){triggerWorkUpdate(e);}
+    [this](const dpp::message_create_t &e){Triggers::workUpdate(e);}
   );
 }
 
@@ -44,6 +51,11 @@ dpp::snowflake Bot::fetchGuildId(ConfigManager &cfg) {
       throw std::runtime_error("guild_id is missing");
     }
   }
+
+void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
+  m_config.set("work_progress_channel", static_cast<uint64_t>(channel_id));
+  m_work_progress_channel = channel_id;
+}
 
 void Bot::start() { m_core.start(dpp::st_wait); }
 

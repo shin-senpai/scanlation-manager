@@ -1,8 +1,8 @@
 // Associated Header Include
+#include "discord/eventHandlers/triggers/WorkUpdate.hpp"
 
 // User Defined Includes
-#include "discord/Bot.hpp"
-#include "models/WorkUpdate.hpp"
+#include "models/ModelWorkUpdate.hpp"
 
 // Standard Includes
 #include <cstddef>
@@ -14,6 +14,7 @@
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
+#include <dpp/cache.h>
 
 static void normalize(std::string &str) {
   auto new_end = std::remove_if(
@@ -65,7 +66,7 @@ static bool extractChannelName(std::string_view sv, WorkUpdate &update){
   return false;
 }
 
-void Bot::triggerWorkUpdate(const dpp::message_create_t &event) {
+void Triggers::workUpdate(const dpp::message_create_t &event) {
   std::string content = event.msg.content;
   normalize(content);
   

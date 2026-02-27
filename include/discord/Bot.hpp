@@ -38,15 +38,10 @@ private:
   void fillCommandMap();
   void fillTriggerList();
 
-  // Slash Commands
-  void commandPing(const dpp::slashcommand_t &event);
-  void commandSetProgressChannel(const dpp::slashcommand_t &event);
-
-  // Triggers
-  void triggerWorkUpdate(const dpp::message_create_t &event);
-
 public:
   Bot(ConfigManager &cfg);
+
+  void setWorkProgressChannel(dpp::snowflake channel_id);
 
   void start();
 };

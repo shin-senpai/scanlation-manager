@@ -1,0 +1,14 @@
+---
+BasedOnStyle: LLVM
+
+# 1. Enforce NO space between 'if', 'while', 'for', etc. and the '('
+SpaceBeforeParens: Never
+
+# 2. Enforce braces attaching to the same line with a space before them
+BreakBeforeBraces: Attach
+
+# 3. Enforce a space BEFORE the curly brace block
+SpaceBeforeBlocks: Always
+
+IndentWidth: 2
+---

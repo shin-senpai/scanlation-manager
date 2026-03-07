@@ -5,24 +5,26 @@
 #include "models/ModelWorkUpdate.hpp"
 
 // Standard Includes
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <dpp/snowflake.h>
 #include <string>
 #include <string_view>
-#include <charconv>
 
 // Third Party Includes
-#include <dpp/dispatcher.h>
 #include <dpp/cache.h>
+#include <dpp/dispatcher.h>
 
 static void normalize(std::string &str) {
-  auto new_end = std::remove_if(
-      str.begin(), str.end(), [](unsigned char x) { return std::isspace(x) || x < 32 || x > 126; });
+  auto new_end = std::remove_if(str.begin(), str.end(), [](unsigned char x) {
+    return std::isspace(x) || x < 32 || x > 126;
+  });
   str.erase(new_end, str.end());
 }
 
-//Extract channel id channel mentions. Only supports mentions aka <#[snowflake]>
+// Extract channel id channel mentions. Only supports mentions aka
+// <#[snowflake]>
 static bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
 
   size_t start = sv.find("<#");
@@ -35,30 +37,29 @@ static bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
     return false;
   }
 
-  // The actual ID starts 2 characters after the '<'
-  start += 2;
+  start += 2; //skips "<#"
   std::string_view id_str = sv.substr(start, end - start);
 
   uint64_t val = 0;
   auto [ptr, ec] = std::from_chars(id_str.data(), id_str.data() + id_str.size(), val);
 
-  if (ec == std::errc()) {
-       channel_id = val;
-       return true;
+  if (ec == std::errc() && ptr == id_str.data() + id_str.size()) {
+    channel_id = val;
+    return true;
   }
 
   return false;
 }
 
-static bool extractChannelName(std::string_view sv, WorkUpdate &update){
-  
+static bool extractChannelName(std::string_view sv, WorkUpdate &update) {
+
   dpp::snowflake channel_id;
-  if(!extractChannelId(sv, channel_id)){
+  if (!extractChannelId(sv, channel_id)) {
     return false;
   }
 
-  dpp::channel* channel = dpp::find_channel(channel_id);
-  if(channel != nullptr) {
+  dpp::channel *channel = dpp::find_channel(channel_id);
+  if (channel != nullptr) {
     update.series_channel_name = channel->name;
     return true;
   }
@@ -69,15 +70,13 @@ static bool extractChannelName(std::string_view sv, WorkUpdate &update){
 void Triggers::workUpdate(const dpp::message_create_t &event) {
   std::string content = event.msg.content;
   normalize(content);
-  
+
   bool has_next_role;
   if (std::count(content.begin(), content.end(), '|') == 4) {
     has_next_role = true;
-  }
-  else if (std::count(content.begin(), content.end(), '|') == 3) {
+  } else if (std::count(content.begin(), content.end(), '|') == 3) {
     has_next_role = false;
-  }
-  else{
+  } else {
     return;
   }
 
@@ -105,27 +104,28 @@ void Triggers::workUpdate(const dpp::message_create_t &event) {
       update.task = segment;
       break;
     case 4:
-      if(has_next_role) {
+      if (has_next_role) {
         update.next_role = segment;
       }
       break;
     }
 
-    if (end == std::string_view::npos) break;
+    if (end == std::string_view::npos)
+      break;
 
     start = end + 1;
   }
 
-  if(!extractChannelName(update.series_channel, update)) {
+  if (!extractChannelName(update.series_channel, update)) {
     update.series_channel_name = "";
   }
 
-  std::string response = "Work Update\nStaff Name: " + update.staff_name +
-                         "\nSeries Channel: " + update.series_channel +
-                         "\nSeries Channel Name: " + update.series_channel_name +
-                         "\nChapter: " + update.chapter +
-                         "\nTask: " + update.task +
-                         "\nNext Role: " + update.next_role;
+  std::string response =
+      "Work Update\nStaff Name: " + update.staff_name +
+      "\nSeries Channel: " + update.series_channel +
+      "\nSeries Channel Name: " + update.series_channel_name +
+      "\nChapter: " + update.chapter + "\nTask: " + update.task +
+      "\nNext Role: " + update.next_role;
 
   event.reply(response);
 }

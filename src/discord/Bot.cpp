@@ -17,40 +17,29 @@
 #include <dpp/snowflake.h>
 
 // Triggers
-#include "discord/eventHandlers/triggers/WorkUpdate.hpp"
+#include "discord/eventHandlers/triggers/WorkProgress.hpp"
 
 // Commands
-#include "discord/eventHandlers/commands/SetProgressChannel.hpp"
 #include "discord/eventHandlers/commands/Ping.hpp"
+#include "discord/eventHandlers/commands/SetProgressChannel.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
       "Ping Pong",
-      [this](const dpp::slashcommand_t &e) { Commands::ping(e); }
-    };
+      [this](const dpp::slashcommand_t &e) { Commands::ping(e); }};
 
   m_commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
-      {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel",true).add_channel_type(dpp::CHANNEL_TEXT)}
-    };
+      {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
 }
 
 void Bot::fillTriggerList() {
   m_triggers.emplace_back(
-    "Work Progress",
-    [this](const dpp::message_create_t &e){return e.msg.channel_id == m_work_progress_channel;},
-    [this](const dpp::message_create_t &e){Triggers::workUpdate(e);}
-  );
+      "Work Progress",
+      [this](const dpp::message_create_t &e) { return e.msg.channel_id == m_work_progress_channel; },
+      [this](const dpp::message_create_t &e) { Triggers::workProgress(e); });
 }
-
-dpp::snowflake Bot::fetchGuildId(ConfigManager &cfg) {
-    try{
-      return static_cast<dpp::snowflake>(cfg.get<uint64_t>("guild_id"));
-    } catch(...) {
-      throw std::runtime_error("guild_id is missing");
-    }
-  }
 
 void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
   m_config.set("work_progress_channel", static_cast<uint64_t>(channel_id));
@@ -60,20 +49,12 @@ void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
 void Bot::start() { m_core.start(dpp::st_wait); }
 
 Bot::Bot(ConfigManager &cfg)
-    : m_core(cfg.get<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
-      m_config(cfg),
-      m_guild_id(fetchGuildId(cfg)) {
+    : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
+      m_work_progress_channel(static_cast<dpp::snowflake>(m_config.getOptional<uint64_t>("work_progress_channel"))),
+      m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
+      m_config(cfg) {
 
   m_core.on_log(dpp::utility::cout_logger());
-
-  //TODO 
-  //Switch to a more robust way of loading
-  try{
-      m_work_progress_channel = static_cast<dpp::snowflake>(
-          m_config.get<uint64_t>("work_progress_channel"));
-  } catch(...) {
-      m_work_progress_channel = 0; 
-  }
 
   fillCommandMap();
   fillTriggerList();
@@ -86,36 +67,15 @@ Bot::Bot(ConfigManager &cfg)
       // slash_cmds vector to be registered in bulk
       for(const auto &[name, cmd_info] : m_commands) {
         dpp::slashcommand cmd(name, cmd_info.description, m_core.me.id);
-        for (const auto &opt : cmd_info.options) {
+        for(const auto &opt : cmd_info.options) {
           cmd.add_option(opt);
         }
         slash_cmds.push_back(cmd);
       }
 
-      //TODO
-      // CHANGE .guild_ to .global_
       m_core.guild_bulk_command_create(slash_cmds, m_guild_id);
     }
   });
-
-  // The following is to clean up command registration from guild and global
-  /*
-  core.on_ready([this](const dpp::ready_t& event) {
-  if (dpp::run_once<struct cleanup_commands>()) {
-      // 1. Clear ALL Global Commands (These take up to 1 hour to vanish)
-      core.global_bulk_command_delete();
-
-      // 2. Clear ALL Guild Commands for your specific server (Instant)
-      core.guild_bulk_command_delete(GUILD_ID);
-
-      // Optional: Log to console so you know it triggered
-      core.log(dpp::ll_info, "Cleaned up all existing commands.");
-  }
-  */
-
-  // Keep your registration logic BELOW the cleanup or comment it out
-  // for one run to ensure a totally fresh start.
-  //});
 
   m_core.on_slashcommand([this](const dpp::slashcommand_t &event) {
     auto it = this->m_commands.find(event.command.get_command_name());
@@ -125,13 +85,13 @@ Bot::Bot(ConfigManager &cfg)
   });
 
   m_core.on_message_create([this](const dpp::message_create_t &event) {
-    if(event.msg.author.is_bot()) return;
-    
-    for(const auto& trigger : m_triggers){
-      if(trigger.should_trigger(event)){
+    if(event.msg.author.is_bot())
+      return;
+
+    for(const auto &trigger : m_triggers) {
+      if(trigger.should_trigger(event)) {
         trigger.handler(event);
       }
     }
-
   });
 }

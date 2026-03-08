@@ -18,8 +18,6 @@ private:
   const dpp::snowflake m_guild_id;
   dpp::snowflake m_work_progress_channel;
 
-  static dpp::snowflake fetchGuildId(ConfigManager &cfg);
-
   struct CommandInfo {
     std::string description;
     std::function<void(const dpp::slashcommand_t &)> handler;

@@ -26,7 +26,7 @@
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
       "Ping Pong",
-      [this](const dpp::slashcommand_t &e) { Commands::ping(e); }};
+      [](const dpp::slashcommand_t &e) { Commands::ping(e); }};
 
   m_commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",

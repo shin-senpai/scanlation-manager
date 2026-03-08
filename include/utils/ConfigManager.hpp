@@ -28,12 +28,14 @@ public:
                    const std::vector<nlohmann::json> &values);
 
   template <typename T>
-  inline T get(const std::string &key, T default_val = T()) const {
+  inline T getOptional(const std::string &key, T default_val = T()) const {
     std::lock_guard<std::mutex> lock(m_mtx);
-    try {
-      return m_data.value(key, default_val);
-    } catch (const nlohmann::json::exception &e) {
-      return default_val;
-    }
+    return m_data.value(key, default_val);
+  }
+
+  template <typename T>
+  inline T getRequired(const std::string &key) const {
+    std::lock_guard<std::mutex> lock(m_mtx);
+    return m_data.at(key).get<T>();
   }
 };

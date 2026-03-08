@@ -1,0 +1,4 @@
+If:
+  PathExclude: [src/.*, include/.*]
+Diagnostics:
+  Suppress: ["*"]

@@ -4,5 +4,5 @@
 #include <dpp/dispatcher.h>
 
 namespace Triggers {
-    void workUpdate(const dpp::message_create_t &event);
+void workProgress(const dpp::message_create_t &event);
 }

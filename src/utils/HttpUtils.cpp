@@ -27,16 +27,16 @@ private:
 
 public:
   CurlWrapper() : m_curl(curl_easy_init()), m_headers(nullptr) {
-    if (!m_curl) {
+    if(!m_curl) {
       throw std::runtime_error("Unable to initialize CURL");
     }
   }
 
   ~CurlWrapper() {
-    if (m_headers) {
+    if(m_headers) {
       curl_slist_free_all(m_headers);
     }
-    if (m_curl) {
+    if(m_curl) {
       curl_easy_cleanup(m_curl);
     }
   }
@@ -44,11 +44,11 @@ public:
   CURL *getCurl() { return m_curl; }
 
   void appendHeaders(const std::vector<std::string> &header_list) {
-    if (m_headers) {
+    if(m_headers) {
       curl_slist_free_all(m_headers);
       m_headers = nullptr;
     }
-    for (const auto &header_item : header_list) {
+    for(const auto &header_item : header_list) {
       m_headers = curl_slist_append(m_headers, header_item.c_str());
     }
   }
@@ -59,7 +59,7 @@ public:
     char *encode =
         curl_easy_escape(m_curl, unencoded_element.c_str(),
                          static_cast<int>(unencoded_element.length()));
-    if (!encode) {
+    if(!encode) {
       throw std::runtime_error("Failed to encode string");
     }
     std::string encoded_str{static_cast<std::string>(encode)};
@@ -82,7 +82,7 @@ static size_t writeCallback(void *contents, size_t size, size_t nmemb, void *use
 std::vector<std::string> urlEncode(const std::vector<std::string> &unencoded_data) {
   CurlWrapper wrapper;
   std::vector<std::string> encoded_data{};
-  for (const std::string &str : unencoded_data) {
+  for(const std::string &str : unencoded_data) {
     encoded_data.push_back(wrapper.encode(str));
   }
   return encoded_data;
@@ -99,7 +99,7 @@ static int executeRequest(CurlWrapper &wrapper, const std::string &url,
   curl_easy_setopt(wrapper.getCurl(), CURLOPT_WRITEDATA, &read_buffer);
 
   CURLcode response = curl_easy_perform(wrapper.getCurl());
-  if (response != CURLE_OK) {
+  if(response != CURLE_OK) {
     std::cerr << "Request failed: " << curl_easy_strerror(response) << '\n';
     return 0;
   }

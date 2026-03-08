@@ -5,7 +5,7 @@
 // Standard Includes
 #include <string>
 
-struct WorkUpdate {
+struct WorkProgress {
   std::string staff_name = "";
   std::string series_channel = "";
   std::string series_channel_name = "";

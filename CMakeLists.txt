@@ -13,45 +13,31 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 find_package(Threads REQUIRED)
 find_package(CURL REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(DPP)
+
+include(FetchContent)
+
+set(DPP_USE_EXTERNAL_JSON ON)
+
+FetchContent_Declare(
+    dpp
+    URL https://github.com/brainboxdotcc/DPP/archive/refs/tags/v10.1.4.tar.gz
+)
+
+FetchContent_MakeAvailable(dpp)
+add_library(dpp::dpp ALIAS dpp)
 
 target_include_directories(${PROJECT_NAME}
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Threads::Threads
-        OpenSSL::SSL
-        OpenSSL::Crypto
         CURL::libcurl
         nlohmann_json::nlohmann_json
+        dpp::dpp
 )
-
-if (DPP_FOUND)
-    target_link_libraries(${PROJECT_NAME} PRIVATE dpp)
-else()
-    find_package(Git REQUIRED)
-
-    message(WARNING "Could not find DPP install. Building from source instead.")
-
-    if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
-        execute_process(
-            COMMAND ${GIT_EXECUTABLE} submodule update --init
-            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            RESULT_VARIABLE RESULT
-        )
-
-        if (NOT RESULT EQUAL 0)
-            message(FATAL_ERROR "Failed to update the D++ submodule.")
-        endif()
-
-        add_subdirectory(DPP)
-        target_link_libraries(${PROJECT_NAME} PRIVATE dpp)
-    else()
-        message(FATAL_ERROR "Failed to find the git executable. Can't update the D++ submodule.")
-    endif()
-endif()
 
 set(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config.json")
 set(CONFIG_DEST "${CMAKE_CURRENT_BINARY_DIR}/config.json")

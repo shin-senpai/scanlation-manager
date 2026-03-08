@@ -16,7 +16,7 @@
 #include <dpp/snowflake.h>
 
 // Extract channel id channel mentions. Only supports mentions aka <#[snowflake]>
-bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
+bool ChannelUtils::extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
 
   size_t start = sv.find("<#");
   if(start == std::string_view::npos) {
@@ -42,10 +42,10 @@ bool extractChannelId(std::string_view &sv, dpp::snowflake &channel_id) {
   return false;
 }
 
-std::optional<std::string> extractChannelName(std::string_view sv) {
+std::optional<std::string> ChannelUtils::extractChannelName(std::string_view sv) {
 
   dpp::snowflake channel_id;
-  if(!extractChannelId(sv, channel_id)) {
+  if(!ChannelUtils::extractChannelId(sv, channel_id)) {
     return std::nullopt;
   }
 

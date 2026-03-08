@@ -14,9 +14,9 @@ class ConfigManager;
 class Bot {
 private:
   dpp::cluster m_core;
-  ConfigManager &m_config;
-  const dpp::snowflake m_guild_id;
   dpp::snowflake m_work_progress_channel;
+  const dpp::snowflake m_guild_id;
+  ConfigManager &m_config;
 
   struct CommandInfo {
     std::string description;

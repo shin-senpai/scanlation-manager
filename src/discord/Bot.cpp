@@ -31,7 +31,9 @@ void Bot::fillCommandMap() {
   m_commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
-      {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
+      {
+        dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)
+      }};
 }
 
 void Bot::fillTriggerList() {
@@ -50,7 +52,7 @@ void Bot::start() { m_core.start(dpp::st_wait); }
 
 Bot::Bot(ConfigManager &cfg)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
-      m_work_progress_channel(static_cast<dpp::snowflake>(m_config.getOptional<uint64_t>("work_progress_channel"))),
+      m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
       m_config(cfg) {
 

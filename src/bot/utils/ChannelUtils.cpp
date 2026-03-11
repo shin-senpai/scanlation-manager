@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "discord/utils/ChannelUtils.hpp"
+#include "bot/utils/ChannelUtils.hpp"
 
 // User Defined Includes
 

@@ -1,8 +1,8 @@
 // Associated Header Include
-#include "discord/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/SetProgressChannel.hpp"
 
 // User Defined Includes
-#include "discord/Bot.hpp"
+#include "bot/Bot.hpp"
 
 // Standard Includes
 

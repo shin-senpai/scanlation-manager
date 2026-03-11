@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "discord/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/Ping.hpp"
 
 // User Defined Includes
 

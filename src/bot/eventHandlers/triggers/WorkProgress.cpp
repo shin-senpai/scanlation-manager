@@ -1,8 +1,8 @@
 // Associated Header Include
-#include "discord/eventHandlers/triggers/WorkProgress.hpp"
+#include "bot/eventHandlers/triggers/WorkProgress.hpp"
 
 // User Defined Includes
-#include "discord/utils/ChannelUtils.hpp"
+#include "bot/utils/ChannelUtils.hpp"
 #include "models/ModelWorkProgress.hpp"
 
 // Standard Includes

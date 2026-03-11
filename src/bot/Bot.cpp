@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "discord/Bot.hpp"
+#include "bot/Bot.hpp"
 
 // User Defined Includes
 #include "utils/ConfigManager.hpp"
@@ -17,11 +17,11 @@
 #include <dpp/snowflake.h>
 
 // Triggers
-#include "discord/eventHandlers/triggers/WorkProgress.hpp"
+#include "bot/eventHandlers/triggers/WorkProgress.hpp"
 
 // Commands
-#include "discord/eventHandlers/commands/Ping.hpp"
-#include "discord/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/SetProgressChannel.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {

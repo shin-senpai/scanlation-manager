@@ -1,7 +1,7 @@
 // Associated Header Include
 
 // User Defined Includes
-#include "discord/Bot.hpp"
+#include "bot/Bot.hpp"
 #include "utils/ConfigManager.hpp"
 #include "utils/HttpUtils.hpp"
 

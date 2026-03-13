@@ -22,6 +22,7 @@
 // Commands
 #include "bot/eventHandlers/commands/Ping.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/WorkProgress.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -31,9 +32,7 @@ void Bot::fillCommandMap() {
   m_commands["set-progress-channel"] = {
       "Sets the channel where progress should be posted",
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
-      {
-        dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)
-      }};
+      {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
 }
 
 void Bot::fillTriggerList() {
@@ -48,7 +47,13 @@ void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
   m_work_progress_channel = channel_id;
 }
 
-void Bot::start() { m_core.start(dpp::st_wait); }
+dpp::cluster& Bot::getCore() {
+  return m_core;
+}
+
+const dpp::cluster& Bot::getCore() const {
+  return m_core;
+}
 
 Bot::Bot(ConfigManager &cfg)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
@@ -86,6 +91,21 @@ Bot::Bot(ConfigManager &cfg)
     }
   });
 
+  m_core.on_autocomplete([this](const dpp::autocomplete_t &event) {
+    auto it = this->m_commands.find(event.name);
+    if(it == m_commands.end() || !it->second.autocomplete_handler) {
+      return;
+    }
+
+    for(const auto &option : event.options) {
+      if(option.focused) {
+        std::string input = std::get<std::string>(option.value);
+        it->second.autocomplete_handler(option.name, input, event);
+        return;
+      }
+    }
+  });
+
   m_core.on_message_create([this](const dpp::message_create_t &event) {
     if(event.msg.author.is_bot())
       return;
@@ -97,3 +117,5 @@ Bot::Bot(ConfigManager &cfg)
     }
   });
 }
+
+void Bot::start() { m_core.start(dpp::st_wait); }

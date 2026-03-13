@@ -22,6 +22,7 @@ private:
     std::string description;
     std::function<void(const dpp::slashcommand_t &)> handler;
     std::vector<dpp::command_option> options = {};
+    std::function<void(const std::string& option_name, const std::string &, const dpp::autocomplete_t &)> autocomplete_handler = {};
   };
 
   struct TriggerInfo {
@@ -38,6 +39,9 @@ private:
 
 public:
   Bot(ConfigManager &cfg);
+
+  dpp::cluster& getCore();
+  const dpp::cluster& getCore() const;
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
 

@@ -33,6 +33,16 @@ void Bot::fillCommandMap() {
       "Sets the channel where progress should be posted",
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
       {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
+
+  m_commands["work-update"] = {
+      "Update your progress on a Chapter",
+      [this](const dpp::slashcommand_t &e) { Commands::workProgress(e); },
+      {
+          dpp::command_option(dpp::co_string, "series", "Choose Series", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "chapter", "Choose Chapter", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "task", "Choose Task", true).set_auto_complete(true),
+      },
+      [this](const std::string &option_name, const std::string &input, const dpp::autocomplete_t &e) { Commands::workProgressAutocomplete(*this, option_name, input, e); }};
 }
 
 void Bot::fillTriggerList() {

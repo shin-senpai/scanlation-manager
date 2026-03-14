@@ -1,0 +1,8 @@
+{
+  "folders": [
+    { "name": "Discord Bot", "path": "discord" },
+    { "name": "Database", "path": "db" },
+    { "name": "Frontend", "path": "frontend" },
+    { "name": "Backend", "path": "backend" }
+  ]
+}

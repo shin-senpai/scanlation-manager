@@ -1,0 +1,14 @@
+BasedOnStyle: LLVM
+
+# Enforce NO space between 'if', 'while', 'for', etc. and the '('
+SpaceBeforeParens: Never
+
+# Enforce braces attaching to the same line with a space before them
+BreakBeforeBraces: Attach
+
+# --- Indentation ---
+IndentWidth: 2
+IndentCaseLabels: true
+
+# --- Line Length ---
+ColumnLimit: 0

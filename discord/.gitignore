@@ -1,0 +1,5 @@
+#discord-bot
+.vscode/
+.cache/
+build/
+config.json

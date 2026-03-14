@@ -53,8 +53,7 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &option_name
   }
 
   bot.getCore().interaction_response_create(
-    event.command.id,
-    event.command.token,
-    r
-  );
+      event.command.id,
+      event.command.token,
+      r);
 }

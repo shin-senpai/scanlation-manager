@@ -15,6 +15,7 @@
 #include <dpp/cache.h>
 #include <dpp/dispatcher.h>
 
+// Removes spaces and non-displayable ASCII characters
 static void normalize(std::string &str) {
   auto new_end = std::remove_if(str.begin(), str.end(), [](unsigned char x) {
     return std::isspace(x) || x < 32 || x > 126;

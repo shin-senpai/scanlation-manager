@@ -9,15 +9,19 @@
 // Third Party Includes
 #include <pqxx/pqxx>
 
-class PooledConnections {
+class DbSession {
 private:
   ConnectionPool &m_pool;
   std::unique_ptr<pqxx::connection> m_conn;
+  pqxx::work m_txn;
 
 public:
-  explicit PooledConnections(ConnectionPool &pool);
+  explicit DbSession(ConnectionPool &pool);
+  ~DbSession();
 
-  ~PooledConnections();
+  DbSession(const DbSession &) = delete;
+  DbSession &operator=(const DbSession &) = delete;
 
-  pqxx::connection &get();
+  pqxx::work &tx();
+  void commit();
 };

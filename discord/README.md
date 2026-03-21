@@ -23,6 +23,7 @@ scanlation-manager/
 | Status | Feature |
 |--------|---------|
 | ✅ | `/ping` — Health check command |
+| ✅ | `/register` — Register a Discord user as a team member |
 | ✅ | `/set-progress-channel` — Designate a channel for work progress messages |
 | ✅ | Work progress message trigger — Parses and echoes structured progress updates |
 | 🚧 | `/work-update` — Slash command to submit a work progress update (autocomplete for series/chapter/task in progress) |
@@ -37,20 +38,30 @@ scanlation-manager/
 discord/
 ├── main.cpp
 ├── bot/
-│   ├── Bot.hpp / Bot.cpp                  # Core bot class, command & trigger registration
+│   ├── Bot.hpp / Bot.cpp                      # Core bot class, command & trigger registration
 │   └── eventHandlers/
 │       ├── commands/
 │       │   ├── Ping.hpp / Ping.cpp
+│       │   ├── RegisterUser.hpp / RegisterUser.cpp
 │       │   ├── SetProgressChannel.hpp / SetProgressChannel.cpp
 │       │   └── WorkProgress.hpp / WorkProgress.cpp
-│       └── triggers/
-│           └── WorkProgress.hpp / WorkProgress.cpp
+│       ├── triggers/
+│       │   └── WorkProgress.hpp / WorkProgress.cpp
+│       └── utils/
+│           └── ChannelUtils.hpp / ChannelUtils.cpp  # Channel mention parsing helpers
+├── db/
+│   ├── Db.hpp / Db.cpp                        # High-level DB wrapper
+│   ├── DbSession.hpp / DbSession.cpp          # Transaction session (RAII)
+│   ├── ConnectionPool.hpp / ConnectionPool.cpp # Thread-safe connection pooling
+│   └── repositories/
+│       ├── User.hpp / User.cpp                # User CRUD
+│       └── DiscordIdentities.hpp / DiscordIdentities.cpp  # Discord ID ↔ user linking
 ├── models/
-│   └── ModelWorkProgress.hpp              # WorkProgress data struct
+│   ├── ModelUser.hpp                          # User entity struct
+│   └── ModelWorkProgress.hpp                  # WorkProgress data struct
 └── utils/
-    ├── ChannelUtils.hpp / ChannelUtils.cpp  # Channel mention parsing helpers
-    ├── ConfigManager.hpp / ConfigManager.cpp # JSON config read/write
-    └── HttpUtils.hpp / HttpUtils.cpp         # libcurl HTTP GET/POST wrappers
+    ├── ConfigManager.hpp / ConfigManager.cpp  # Thread-safe JSON config read/write
+    └── HttpUtils.hpp / HttpUtils.cpp          # libcurl HTTP GET/POST wrappers
 ```
 
 ---
@@ -63,6 +74,7 @@ The bot reads from a `config.json` file at the working directory. The following 
 |-----|----------|------|-------------|
 | `discord_bot_token` | ✅ | `string` | Your Discord bot token |
 | `guild_id` | ✅ | `uint64` | The Discord server (guild) ID to register commands to |
+| `database` | ✅ | `string` | PostgreSQL connection string |
 | `work_progress_channel` | ❌ | `uint64` | Channel ID for progress message trigger (can be set via `/set-progress-channel`) |
 | `gsheet_auth_token` | ❌ | `string` | Auth token for Google Sheets private API (future use) |
 | `gsheet_priv_api_url` | ❌ | `string` | Endpoint URL for Google Sheets private API (future use) |
@@ -72,6 +84,7 @@ The bot reads from a `config.json` file at the working directory. The following 
 {
   "discord_bot_token": "YOUR_TOKEN_HERE",
   "guild_id": 123456789012345678,
+  "database": "host=localhost port=5432 dbname=scanlation user=postgres password=yourpassword",
   "work_progress_channel": 987654321098765432
 }
 ```
@@ -91,21 +104,22 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 ## Dependencies
 
 - [D++ (libdpp)](https://dpp.dev/) — Discord API wrapper
+- [libpqxx](https://pqxx.org/) — PostgreSQL C++ client
 - [nlohmann/json](https://github.com/nlohmann/json) — JSON parsing for config
 - [libcurl](https://curl.se/libcurl/) — HTTP client for external API calls
-- CMake (build system)
+- CMake 3.28+ (build system)
 
 ---
 
 ## Building
 
-> Build instructions depend on the CMake setup in `discord/`. Ensure all dependencies are installed and available to CMake.
+> Ensure all dependencies (D++, libpqxx, libcurl) are installed and available to CMake. The database must also be running and migrated before starting the bot (see `db/`).
 
 ```bash
 cd discord
-mkdir build && cd build
-cmake ..
-make
+cmake -B build
+cmake --build build
+./build/scanlation-bot
 ```
 
 ---
@@ -131,6 +145,9 @@ StaffName|<#channelId>|ChapterNumber|Task|NextRole
 ### `/ping`
 Simple health check. Responds with `Pong! 🏓`.
 
+### `/register`
+Registers the calling Discord user as a scanlation team member. Creates a user record in the database and links their Discord identity to it. Returns a confirmation message, or an error if they are already registered.
+
 ### `/set-progress-channel [channel]`
 Sets the channel where the bot will watch for work progress messages. The setting is persisted to `config.json`.
 
@@ -143,3 +160,4 @@ Allows staff to submit a work update via slash command with autocomplete for ser
 
 - Commands are registered per-guild (not globally) for faster propagation during development.
 - The `ConfigManager` is thread-safe and persists changes to disk on every `set` call.
+- The database layer uses a connection pool with RAII transaction sessions; all queries use parameterized statements.

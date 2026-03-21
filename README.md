@@ -14,16 +14,22 @@ The core idea is that both the Discord bot and the future web app share the same
 
 ---
 
-## Planned Features
+## Features
 
-- **User permissions** — Basic flags for supermanager and manager roles
-- **Custom roles** — Define what capabilities a user has within the group
-- **Custom tasks** — Define the steps that must be completed before a chapter can be released
-- **Task dependencies** — Specify which tasks block other tasks
-- **Series & chapter tracking** — Track which series are active and who is assigned to what at the chapter level
-- **Contribution history** — Record who completed which task, for which chapter, under which alias, and when
-- **To-do lists** — See which tasks are outstanding and who is responsible for them
-- **Release summaries** — Query releases with sorting and filtering
+The database schema models all of the following. Bot commands and web UI to expose them are progressively being built on top.
+
+| Status | Feature |
+|--------|---------|
+| ✅ schema, ✅ bot | User registration — link Discord identities to team member accounts |
+| ✅ schema, 🚧 bot | User permissions — supermanager and manager flags |
+| ✅ schema, 🚧 bot | Custom roles — define capabilities for team members |
+| ✅ schema, 🚧 bot | User aliases — track contributors under different names over time |
+| ✅ schema, 🚧 bot | Custom tasks — define the steps required before a chapter can be released |
+| ✅ schema, 🚧 bot | Task dependencies — specify which tasks block other tasks |
+| ✅ schema, 🚧 bot | Series & chapter tracking — track active series and per-chapter assignments |
+| ✅ schema, 🚧 bot | Contribution history — record who completed which task, for which chapter, under which alias, and when |
+| 🚧 bot | To-do lists — see which tasks are outstanding and who is responsible |
+| 🚧 bot | Release summaries — query releases with sorting and filtering |
 
 ---
 

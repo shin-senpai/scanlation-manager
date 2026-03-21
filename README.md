@@ -1,35 +1,96 @@
-# D++ CMake Template (templatebot)
+# scanlation-manager
 
-CMake template for a simple [D++](https://dpp.dev) bot. This template assumes that D++ is already installed.
+A management platform for scanlation groups — tracking series, chapters, tasks, and contributors. The project is built as a monorepo with a shared PostgreSQL database, currently with an active Discord bot and a planned web app that will both operate against the same data.
 
-## Compilation
+> **Status: In Progress.** The Discord bot is the primary focus right now. The web app (backend + frontend) is planned but not yet implemented.
 
-    mkdir build
-    cd build
-    cmake ..
-    make -j
+---
 
-If DPP is installed in a different location you can specify the root directory to look in while running cmake 
+## Overview
 
-    cmake .. -DDPP_ROOT_DIR=<your-path>
+Scanlation groups juggle a lot: multiple series, multiple contributors each filling different roles, custom workflows per project, and the need to track who did what and when. This tool aims to centralize all of that.
 
-## Running the template bot
+The core idea is that both the Discord bot and the future web app share the same database — so a group can use whichever interface fits their workflow, or both at once.
 
-Create a config.json in the directory above the build directory:
+---
 
-```json
-{ "token": "your bot token here" }
+## Planned Features
+
+- **User permissions** — Basic flags for supermanager and manager roles
+- **Custom roles** — Define what capabilities a user has within the group
+- **Custom tasks** — Define the steps that must be completed before a chapter can be released
+- **Task dependencies** — Specify which tasks block other tasks
+- **Series & chapter tracking** — Track which series are active and who is assigned to what at the chapter level
+- **Contribution history** — Record who completed which task, for which chapter, under which alias, and when
+- **To-do lists** — See which tasks are outstanding and who is responsible for them
+- **Release summaries** — Query releases with sorting and filtering
+
+---
+
+## Monorepo Structure
+
+```
+scanlation-manager/
+├── discord/       # Discord bot (C++/D++) — actively developed
+├── db/            # Database migrations and Docker Compose setup
+├── backend/       # REST API / server — planned
+└── frontend/      # Web UI — planned
 ```
 
-Start the bot:
+### discord/
 
-    cd build
-    ./templatebot
+The Discord bot is the first interface into the system. Built with C++20 and [D++](https://dpp.dev/) (a Discord API library), backed by PostgreSQL via `libpqxx`.
 
-## Extending the bot
+See [`discord/README.md`](discord/README.md) for build instructions, configuration, and command documentation.
 
-You can add as many header files and .cpp files into the src and include folders as you wish. All .cpp files in the src directory will be linked together into the bot's executable.
+### db/
 
-## Renaming the bot
+PostgreSQL 16 database, run via Docker Compose. Contains migration scripts that define the shared schema used by all services.
 
-To rename the bot, search and replace "templatebot" in the `CMakeLists.txt` with your new bots name and then rename the templatebot folder in include. Rerun `cmake ..` from the `build` directory and rebuild.
+### backend/ & frontend/
+
+Not yet implemented. The backend will expose the same data as the Discord bot through a REST (or similar) API; the frontend will be a web UI consuming that API.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Discord bot | C++20, [D++](https://dpp.dev/) v10.1.4 |
+| Database | PostgreSQL 16 (Docker) |
+| DB client (C++) | libpqxx 8.0.0 |
+| Build system | CMake 3.28+ |
+| Backend | TBD |
+| Frontend | TBD |
+
+---
+
+## Getting Started
+
+For now, setup means running the database and the Discord bot.
+
+**1. Start the database**
+
+```sh
+cd db
+cp docker-compose.yml.example docker-compose.yml  # fill in your values
+docker compose up -d
+```
+
+**2. Build and run the Discord bot**
+
+```sh
+cd discord
+cp config.json.example config.json  # fill in your bot token etc.
+cmake -B build && cmake --build build
+./build/scanlation-bot
+```
+
+See [`discord/README.md`](discord/README.md) for full details.
+
+---
+
+## License
+
+See [LICENSE](LICENSE).

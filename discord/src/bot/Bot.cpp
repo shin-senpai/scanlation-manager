@@ -21,6 +21,7 @@
 
 // Commands
 #include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/WorkProgress.hpp"
 
@@ -43,6 +44,10 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_string, "task", "Choose Task", true).set_auto_complete(true),
       },
       [this](const std::string &option_name, const std::string &input, const dpp::autocomplete_t &e) { Commands::workProgressAutocomplete(*this, option_name, input, e); }};
+
+  m_commands["register"] = {
+      "Register yourself as a scanlation team member",
+      [this](const dpp::slashcommand_t &e) { Commands::registerUser(*this, e); }};
 }
 
 void Bot::fillTriggerList() {
@@ -57,19 +62,24 @@ void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
   m_work_progress_channel = channel_id;
 }
 
-dpp::cluster& Bot::getCore() {
+dpp::cluster &Bot::getCore() {
   return m_core;
 }
 
-const dpp::cluster& Bot::getCore() const {
+const dpp::cluster &Bot::getCore() const {
   return m_core;
 }
 
-Bot::Bot(ConfigManager &cfg)
+Db &Bot::getDb() {
+  return m_db;
+}
+
+Bot::Bot(ConfigManager &cfg, Db &db)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
-      m_config(cfg) {
+      m_config(cfg),
+      m_db(db) {
 
   m_core.on_log(dpp::utility::cout_logger());
 

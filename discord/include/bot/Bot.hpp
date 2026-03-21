@@ -1,5 +1,8 @@
 #pragma once
 
+// User Defined Includes
+#include "db/Db.hpp"
+
 // Standard Includes
 #include <functional>
 #include <string>
@@ -17,12 +20,13 @@ private:
   dpp::snowflake m_work_progress_channel;
   const dpp::snowflake m_guild_id;
   ConfigManager &m_config;
+  Db &m_db;
 
   struct CommandInfo {
     std::string description;
     std::function<void(const dpp::slashcommand_t &)> handler;
     std::vector<dpp::command_option> options = {};
-    std::function<void(const std::string& option_name, const std::string &, const dpp::autocomplete_t &)> autocomplete_handler = {};
+    std::function<void(const std::string &option_name, const std::string &, const dpp::autocomplete_t &)> autocomplete_handler = {};
   };
 
   struct TriggerInfo {
@@ -38,10 +42,12 @@ private:
   void fillTriggerList();
 
 public:
-  Bot(ConfigManager &cfg);
+  Bot(ConfigManager &cfg, Db &db);
 
-  dpp::cluster& getCore();
-  const dpp::cluster& getCore() const;
+  dpp::cluster &getCore();
+  const dpp::cluster &getCore() const;
+
+  Db &getDb();
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
 

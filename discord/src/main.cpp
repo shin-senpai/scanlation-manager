@@ -2,7 +2,6 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
-#include "db/Db.hpp"
 #include "utils/ConfigManager.hpp"
 #include "utils/HttpUtils.hpp"
 
@@ -53,11 +52,10 @@ int main(int argc, char const *argv[]) {
   // // --- GOOGLE SHEETS API TEST END ---
 
   try {
-    Db db(config.getRequired<std::string>("database"), 10);
-    Bot scan_manager(config, db);
+    Bot scan_manager(config);
     scan_manager.start();
   } catch(const std::exception &e) {
-    std::cerr << "Failed to initialize: " << e.what() << std::endl;
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   return 0;

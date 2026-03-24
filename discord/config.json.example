@@ -2,7 +2,8 @@
     "discord_bot_token": "",
     "gsheet_auth_token": "",
     "gsheet_priv_api_url": "",
-    "database": "",
+    "db_connection_string": "postgresql://scanlation_manager:scanlation@localhost:5432/scanlation_manager",
+    "db_pool_size": 10,
     "guild_id": GUILD_ID,
     "work_progress_channel": ""
 }

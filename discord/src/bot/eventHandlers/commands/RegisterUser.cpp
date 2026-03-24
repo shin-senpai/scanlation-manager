@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/User.hpp"
 
@@ -20,7 +21,7 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
   const std::string display_name = event.command.usr.username;
 
   try {
-    auto session = bot.getDb().session();
+    DbSession session(bot.getPool());
 
     UserRepository user_repo;
     DiscordIdentityRepository identity_repo;

@@ -1,7 +1,7 @@
 #pragma once
 
 // User Defined Includes
-#include "db/Db.hpp"
+#include "db/ConnectionPool.hpp"
 
 // Standard Includes
 #include <functional>
@@ -20,7 +20,7 @@ private:
   dpp::snowflake m_work_progress_channel;
   const dpp::snowflake m_guild_id;
   ConfigManager &m_config;
-  Db &m_db;
+  ConnectionPool m_pool;
 
   struct CommandInfo {
     std::string description;
@@ -42,12 +42,11 @@ private:
   void fillTriggerList();
 
 public:
-  Bot(ConfigManager &cfg, Db &db);
+  Bot(ConfigManager &cfg);
 
   dpp::cluster &getCore();
   const dpp::cluster &getCore() const;
-
-  Db &getDb();
+  ConnectionPool &getPool();
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
 

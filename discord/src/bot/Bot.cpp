@@ -2,6 +2,7 @@
 #include "bot/Bot.hpp"
 
 // User Defined Includes
+#include "db/ConnectionPool.hpp"
 #include "utils/ConfigManager.hpp"
 
 // Standard Includes
@@ -70,16 +71,16 @@ const dpp::cluster &Bot::getCore() const {
   return m_core;
 }
 
-Db &Bot::getDb() {
-  return m_db;
+ConnectionPool &Bot::getPool() {
+  return m_pool;
 }
 
-Bot::Bot(ConfigManager &cfg, Db &db)
+Bot::Bot(ConfigManager &cfg)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
       m_config(cfg),
-      m_db(db) {
+      m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<int>("db_pool_size")) {
 
   m_core.on_log(dpp::utility::cout_logger());
 

@@ -23,7 +23,7 @@ The database schema models all of the following. Bot commands and web UI to expo
 | ✅ schema, ✅ bot | User registration — link Discord identities to team member accounts |
 | ✅ schema, 🚧 bot | User permissions — supermanager and manager flags |
 | ✅ schema, 🚧 bot | Custom roles — define capabilities for team members |
-| ✅ schema, 🚧 bot | User aliases — track contributors under different names over time |
+| ✅ schema, ✅ db layer, 🚧 bot | User aliases — track contributors under different names over time |
 | ✅ schema, 🚧 bot | Custom tasks — define the steps required before a chapter can be released |
 | ✅ schema, 🚧 bot | Task dependencies — specify which tasks block other tasks |
 | ✅ schema, 🚧 bot | Series & chapter tracking — track active series and per-chapter assignments |
@@ -90,7 +90,7 @@ docker compose up -d
 cd discord
 cp config.json.example config.json  # fill in your bot token etc.
 cmake -B build && cmake --build build
-./build/scanlation-bot
+./build/scanlation-manager
 ```
 
 See [`discord/README.md`](discord/README.md) for full details.

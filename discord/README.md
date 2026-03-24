@@ -50,12 +50,12 @@ discord/
 │       └── utils/
 │           └── ChannelUtils.hpp / ChannelUtils.cpp  # Channel mention parsing helpers
 ├── db/
-│   ├── Db.hpp / Db.cpp                        # High-level DB wrapper
 │   ├── DbSession.hpp / DbSession.cpp          # Transaction session (RAII)
 │   ├── ConnectionPool.hpp / ConnectionPool.cpp # Thread-safe connection pooling
 │   └── repositories/
 │       ├── User.hpp / User.cpp                # User CRUD
-│       └── DiscordIdentities.hpp / DiscordIdentities.cpp  # Discord ID ↔ user linking
+│       ├── DiscordIdentities.hpp / DiscordIdentities.cpp  # Discord ID ↔ user linking
+│       └── UserAliases.hpp / UserAliases.cpp  # User alias create/read/retire
 ├── models/
 │   ├── ModelUser.hpp                          # User entity struct
 │   └── ModelWorkProgress.hpp                  # WorkProgress data struct
@@ -119,7 +119,7 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 cd discord
 cmake -B build
 cmake --build build
-./build/scanlation-bot
+./build/scanlation-manager
 ```
 
 ---
@@ -160,4 +160,4 @@ Allows staff to submit a work update via slash command with autocomplete for ser
 
 - Commands are registered per-guild (not globally) for faster propagation during development.
 - The `ConfigManager` is thread-safe and persists changes to disk on every `set` call.
-- The database layer uses a connection pool with RAII transaction sessions; all queries use parameterized statements.
+- The database layer uses a `ConnectionPool` (accessed via `Bot::getPool()`) with RAII transaction sessions; all queries use parameterized statements.

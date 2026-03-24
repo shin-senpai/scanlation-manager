@@ -89,7 +89,7 @@ docker compose up -d
 ```sh
 cd discord
 cp config.json.example config.json  # fill in your bot token etc.
-cmake -B build && cmake --build build
+cmake --preset default && cmake --build --preset default
 ./build/scanlation-manager
 ```
 

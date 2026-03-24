@@ -23,6 +23,7 @@
 // Commands
 #include "bot/eventHandlers/commands/Ping.hpp"
 #include "bot/eventHandlers/commands/RegisterUser.hpp"
+#include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/WorkProgress.hpp"
 
@@ -49,6 +50,11 @@ void Bot::fillCommandMap() {
   m_commands["register"] = {
       "Register yourself as a scanlation team member",
       [this](const dpp::slashcommand_t &e) { Commands::registerUser(*this, e); }};
+
+  m_commands["set-alias"] = {
+      "Set the alias that you want to use for credit",
+      [this](const dpp::slashcommand_t &e) { Commands::setAlias(*this, e); },
+      {dpp::command_option(dpp::co_string, "alias", "The Credit Name you want to use", true)}};
 }
 
 void Bot::fillTriggerList() {

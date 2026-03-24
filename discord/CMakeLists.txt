@@ -17,14 +17,22 @@ find_package(nlohmann_json REQUIRED)
 include(FetchContent)
 
 set(DPP_USE_EXTERNAL_JSON ON)
-
 FetchContent_Declare(
     dpp
     URL https://github.com/brainboxdotcc/DPP/archive/refs/tags/v10.1.4.tar.gz
 )
-
 FetchContent_MakeAvailable(dpp)
 add_library(dpp::dpp ALIAS dpp)
+
+FetchContent_Declare(
+    libpqxx
+    GIT_REPOSITORY https://github.com/jtv/libpqxx.git
+    GIT_TAG        8.0.0
+    GIT_SHALLOW    TRUE
+)
+set(SKIP_BUILD_TEST ON CACHE BOOL "" FORCE)
+set(BUILD_DOC OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(libpqxx)
 
 target_include_directories(${PROJECT_NAME}
     PRIVATE 
@@ -37,6 +45,7 @@ target_link_libraries(${PROJECT_NAME}
         CURL::libcurl
         nlohmann_json::nlohmann_json
         dpp::dpp
+        libpqxx::pqxx
 )
 
 set(CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config.json")

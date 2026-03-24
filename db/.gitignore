@@ -1,0 +1,4 @@
+#scanlation-manager database
+docker-compose.yml
+postgres_data
+migrations/*.Identifier

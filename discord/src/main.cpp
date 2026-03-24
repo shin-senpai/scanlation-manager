@@ -55,7 +55,7 @@ int main(int argc, char const *argv[]) {
     Bot scan_manager(config);
     scan_manager.start();
   } catch(const std::exception &e) {
-    std::cerr << "Failed to initialize: " << e.what() << std::endl;
+    std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
   }
   return 0;

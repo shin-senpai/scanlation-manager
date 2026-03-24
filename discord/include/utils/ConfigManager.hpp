@@ -18,7 +18,7 @@ private:
   void save();
 
 public:
-  ConfigManager(const std::string &file_path);
+  explicit ConfigManager(const std::string &file_path);
 
   void load();
 

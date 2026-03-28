@@ -29,7 +29,7 @@ void Commands::setAlias(Bot &bot, const dpp::slashcommand_t &event) {
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
     if(!maybe_user_id) {
-      event.reply("User not Found! Please try after running the /register command");
+      event.edit_original_response(dpp::message("User not Found! Please try after running the /register command"));
       return;
     }
     const int64_t user_id = *maybe_user_id;

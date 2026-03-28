@@ -16,5 +16,7 @@ public:
   // Returns the new user's id.
   int create(pqxx::work &txn, const std::string &display_name);
   
+  std::vector<User> listUsers(pqxx::read_transaction &txn);
+
   std::optional<User> findById(pqxx::read_transaction &txn, int id);
 };

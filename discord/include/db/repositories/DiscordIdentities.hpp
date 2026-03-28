@@ -13,5 +13,5 @@ public:
   // Throws pqxx::unique_violation if discord_id is already registered.
   void create(pqxx::work &txn, int64_t discord_id, int user_id);
 
-  std::optional<int> findUserIdByDiscordId(pqxx::work &txn, int64_t discord_id);
+  std::optional<int> findUserIdByDiscordId(pqxx::read_transaction &txn, int64_t discord_id);
 };

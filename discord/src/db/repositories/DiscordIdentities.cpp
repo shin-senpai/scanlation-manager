@@ -7,7 +7,7 @@ void DiscordIdentityRepository::create(pqxx::work &txn, int64_t discord_id, int 
       pqxx::params{discord_id, user_id});
 }
 
-std::optional<int> DiscordIdentityRepository::findUserIdByDiscordId(pqxx::work &txn, int64_t discord_id) {
+std::optional<int> DiscordIdentityRepository::findUserIdByDiscordId(pqxx::read_transaction &txn, int64_t discord_id) {
   auto result = txn.exec(
       "SELECT user_id FROM discord_identities WHERE discord_id = $1",
       pqxx::params{discord_id});

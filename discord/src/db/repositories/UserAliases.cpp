@@ -7,7 +7,7 @@ void UserAliasesRepository::create(pqxx::work &txn, int user_id, std::string &al
       pqxx::params(user_id, alias));
 }
 
-std::optional<std::string> UserAliasesRepository::read(pqxx::work &txn, int user_id) {
+std::optional<std::string> UserAliasesRepository::read(pqxx::read_transaction &txn, int user_id) {
   auto result = txn.exec(
       "SELECT alias FROM user_aliases WHERE user_id = $1 AND retired_at IS NULL",
       pqxx::params(user_id));

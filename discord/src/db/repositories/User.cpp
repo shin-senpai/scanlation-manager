@@ -1,5 +1,6 @@
 // Associated Header Include
 #include "db/repositories/User.hpp"
+#include "models/ModelUser.hpp"
 
 int UserRepository::create(pqxx::work &txn, const std::string &display_name) {
   auto result = txn.exec(
@@ -9,14 +10,15 @@ int UserRepository::create(pqxx::work &txn, const std::string &display_name) {
   return result[0][0].as<int>();
 }
 
-std::optional<User> UserRepository::findById(pqxx::work &txn, int id) {
+std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id) {
   auto result = txn.exec(
       "SELECT id, name, display_name, is_manager, is_supermanager "
       "FROM users WHERE id = $1",
       pqxx::params{id});
 
-  if(result.empty())
+  if(result.empty()) {
     return std::nullopt;
+  }
 
   return User{
       result[0][0].as<int>(),

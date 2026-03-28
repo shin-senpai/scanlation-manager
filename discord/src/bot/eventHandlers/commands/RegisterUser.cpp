@@ -26,8 +26,8 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     UserRepository user_repo;
     DiscordIdentityRepository identity_repo;
 
-    const int user_id = user_repo.create(session.tx(), display_name);
-    identity_repo.create(session.tx(), discord_id, user_id);
+    const int user_id = user_repo.create(session.wtx(), display_name);
+    identity_repo.create(session.wtx(), discord_id, user_id);
 
     session.commit();
 

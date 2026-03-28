@@ -13,7 +13,8 @@ class DbSession {
 private:
   ConnectionPool &m_pool;
   std::unique_ptr<pqxx::connection> m_conn;
-  pqxx::work m_txn;
+  std::optional<pqxx::work> m_wtxn;
+  std::optional<pqxx::read_transaction> m_rtxn;
 
 public:
   explicit DbSession(ConnectionPool &pool);
@@ -22,6 +23,8 @@ public:
   DbSession(const DbSession &) = delete;
   DbSession &operator=(const DbSession &) = delete;
 
-  pqxx::work &tx();
+  pqxx::work &wtx();
+  pqxx::read_transaction &rtx();
+  void closeTx();
   void commit();
 };

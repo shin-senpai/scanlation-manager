@@ -6,6 +6,7 @@
 // Standard Includes
 #include <fstream>
 #include <stdexcept>
+#include <string_view>
 
 // Third Party Includes
 #include <nlohmann/json.hpp>
@@ -34,13 +35,13 @@ void ConfigManager::load() {
   }
 }
 
-void ConfigManager::set(const std::string &key, const nlohmann::json &value) {
+void ConfigManager::set(const std::string_view &key, const nlohmann::json &value) {
   std::lock_guard<std::mutex> lock(m_mtx);
   m_data[key] = value;
   save();
 }
 
-void ConfigManager::setMultiple(const std::vector<std::string> &keys, const std::vector<nlohmann::json> &values) {
+void ConfigManager::setMultiple(const std::vector<std::string_view> &keys, const std::vector<nlohmann::json> &values) {
   if(keys.size() != values.size()) {
     throw ::std::invalid_argument("Keys and Values must have the same size");
   }

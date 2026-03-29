@@ -5,7 +5,7 @@
 
 // Standard Includes
 #include <optional>
-#include <string>
+#include <string_view>
 
 // Third Party Includes
 #include <pqxx/pqxx>
@@ -16,7 +16,7 @@ public:
   // Returns the new user's id.
   int create(
       pqxx::work &txn,
-      const std::string &display_name,
+      const std::string_view &display_name,
       bool is_manager = false,
       bool is_supermanager = false);
 

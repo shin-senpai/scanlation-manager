@@ -4,7 +4,7 @@
 // User Defined Includes
 #include "models/ModelUser.hpp"
 
-int UserRepository::create(pqxx::work &txn, const std::string &display_name, bool is_manager, bool is_supermanager) {
+int UserRepository::create(pqxx::work &txn, const std::string_view &display_name, bool is_manager, bool is_supermanager) {
   auto result = txn.exec(
       "INSERT INTO users (display_name, is_manager, is_supermanager) VALUES ($1, $2, $3) RETURNING id",
       pqxx::params{txn, display_name, is_manager, is_supermanager});

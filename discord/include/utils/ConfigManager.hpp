@@ -4,6 +4,7 @@
 // Standard Includes
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Third Party Includes
@@ -22,19 +23,19 @@ public:
 
   void load();
 
-  void set(const std::string &key, const nlohmann::json &value);
+  void set(const std::string_view &key, const nlohmann::json &value);
 
-  void setMultiple(const std::vector<std::string> &keys,
+  void setMultiple(const std::vector<std::string_view> &keys,
                    const std::vector<nlohmann::json> &values);
 
   template <typename T>
-  inline T getOptional(const std::string &key, T default_val = T()) const {
+  inline T getOptional(const std::string_view &key, T default_val = T()) const {
     std::lock_guard<std::mutex> lock(m_mtx);
     return m_data.value(key, default_val);
   }
 
   template <typename T>
-  inline T getRequired(const std::string &key) const {
+  inline T getRequired(const std::string_view &key) const {
     std::lock_guard<std::mutex> lock(m_mtx);
     return m_data.at(key).get<T>();
   }

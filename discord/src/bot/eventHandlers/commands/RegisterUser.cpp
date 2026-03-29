@@ -27,7 +27,18 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     UserRepository user_repo;
     DiscordIdentityRepository identity_repo;
 
-    const int user_id = user_repo.create(session.wtx(), display_name);
+    bool first_user{false};
+    if(!user_repo.listUsers(session.rtx()).size()) {
+      first_user = true;
+    }
+    session.closeTx();
+
+    int user_id;
+    if(!first_user) {
+      user_id = user_repo.create(session.wtx(), display_name);
+    } else {
+      user_id = user_repo.create(session.wtx(), display_name, true, true);
+    }
     identity_repo.create(session.wtx(), discord_id, user_id);
 
     session.commit();

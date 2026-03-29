@@ -1,11 +1,13 @@
 // Associated Header Include
 #include "db/repositories/User.hpp"
+
+// User Defined Includes
 #include "models/ModelUser.hpp"
 
-int UserRepository::create(pqxx::work &txn, const std::string &display_name) {
+int UserRepository::create(pqxx::work &txn, const std::string &display_name, bool is_manager, bool is_supermanager) {
   auto result = txn.exec(
-      "INSERT INTO users (display_name) VALUES ($1) RETURNING id",
-      pqxx::params{display_name});
+      "INSERT INTO users (display_name, is_manager, is_supermanager) VALUES ($1, $2, $3) RETURNING id",
+      pqxx::params{display_name, is_manager, is_supermanager});
 
   return result[0][0].as<int>();
 }

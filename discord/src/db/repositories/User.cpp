@@ -20,11 +20,13 @@ std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
   users.reserve(rows);
   for(size_t row = 0; row < rows; row++) {
     users.emplace_back(
-        results[row][0].as<int>(),
-        results[row][1].is_null() ? std::nullopt : std::make_optional(results[row][1].as<std::string>()),
-        results[row][2].as<std::string>(),
-        results[row][3].as<bool>(),
-        results[row][4].as<bool>());
+        results[row]["id"].as<int>(),
+        results[row]["name"].is_null() ? std::nullopt : std::make_optional(results[row]["name"].as<std::string>()),
+        results[row]["display_name"].as<std::string>(),
+        results[row]["is_manager"].as<bool>(),
+        results[row]["joined_at"].as<std::string>(),
+        results[row]["left_at"].is_null() ? std::nullopt : std::make_optional(results[row]["left_at"].as<std::string>()),
+        results[row]["is_supermanager"].as<bool>());
   }
 
   return users;
@@ -41,10 +43,11 @@ std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id
   }
 
   return User{
-      result[0][0].as<int>(),
-      result[0][1].is_null() ? std::nullopt : std::make_optional(result[0][1].as<std::string>()),
-      result[0][2].as<std::string>(),
-      result[0][3].as<bool>(),
-      result[0][4].as<bool>(),
-  };
+      result[0]["id"].as<int>(),
+      result[0]["name"].is_null() ? std::nullopt : std::make_optional(result[0][1].as<std::string>()),
+      result[0]["display_name"].as<std::string>(),
+      result[0]["is_manager"].as<bool>(),
+      result[0]["joined_at"].as<std::string>(),
+      result[0]["left_at"].as<std::string>(),
+      result[0]["is_supermanager"].as<bool>()};
 }

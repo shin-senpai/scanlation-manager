@@ -7,6 +7,7 @@
 
 // Standard Includes
 #include <cstdint>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -126,7 +127,12 @@ Bot::Bot(ConfigManager &cfg)
 
     for(const auto &option : event.options) {
       if(option.focused) {
-        std::string input = std::get<std::string>(option.value);
+        std::string input{};
+        try {
+          input = std::get<std::string>(option.value);
+        } catch(std::exception &e) {
+          std::cerr << "Failed to get option's value for autocomplete event: " + event.name << std::endl;
+        }
         it->second.autocomplete_handler(option.name, input, event);
         return;
       }

@@ -36,7 +36,8 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
 
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("You're already registered."));
-  } catch(const std::exception &) {
+  } catch(const std::exception &e) {
     event.edit_original_response(dpp::message("Registration failed. Please try again later."));
+    std::cerr << "User Registration failed due to exception: " << e.what() << std::endl;
   }
 }

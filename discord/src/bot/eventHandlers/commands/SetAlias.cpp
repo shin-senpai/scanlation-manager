@@ -51,6 +51,7 @@ void Commands::setAlias(Bot &bot, const dpp::slashcommand_t &event) {
       event.edit_original_response(dpp::message("You already have an alias"));
     };
   } catch(const std::exception &e) {
-    std::cerr << e.what() << std::endl;
+    std::cerr << "Alias for user (" << discord_id << ") " << "failed to be set due to exception: " << e.what() << std::endl;
+    event.edit_original_response(dpp::message("Unable to set alias. Contact the administrator to resolve this issue"));
   }
 }

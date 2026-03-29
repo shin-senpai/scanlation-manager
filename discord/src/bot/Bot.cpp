@@ -99,8 +99,8 @@ Bot::Bot(ConfigManager &cfg)
 
       // Automatically adds all commands defined in the commands map to the
       // slash_cmds vector to be registered in bulk
-      for(const auto &[name, cmd_info] : m_commands) {
-        dpp::slashcommand cmd(name, cmd_info.description, m_core.me.id);
+      for(const auto &[cmd_name, cmd_info] : m_commands) {
+        dpp::slashcommand cmd(cmd_name, cmd_info.description, m_core.me.id);
         for(const auto &opt : cmd_info.options) {
           cmd.add_option(opt);
         }

@@ -7,7 +7,7 @@
 int UserRepository::create(pqxx::work &txn, const std::string &display_name, bool is_manager, bool is_supermanager) {
   auto result = txn.exec(
       "INSERT INTO users (display_name, is_manager, is_supermanager) VALUES ($1, $2, $3) RETURNING id",
-      pqxx::params{display_name, is_manager, is_supermanager});
+      pqxx::params{txn, display_name, is_manager, is_supermanager});
 
   return result[0][0].as<int>();
 }
@@ -38,7 +38,7 @@ std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id
   auto result = txn.exec(
       "SELECT id, name, display_name, is_manager, is_supermanager "
       "FROM users WHERE id = $1",
-      pqxx::params{id});
+      pqxx::params{txn, id});
 
   if(result.empty()) {
     return std::nullopt;

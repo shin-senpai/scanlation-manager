@@ -20,20 +20,25 @@ Core identity record. Represents anyone who can use the platform.
 | `left_at` | `TIMESTAMPTZ` | `NULL` = currently active |
 
 **Constraints:**
-- A user must have either a `name` or a linked `discord_identities` row — enforced by `enforce_user_name` trigger.
+- A user must have either a `name` or an active `discord_identities` row — enforced by `enforce_user_name` trigger.
 - Removing the last supermanager is blocked by `enforce_supermanager_exists` trigger.
 
 ---
 
 ### `discord_identities`
-Links a Discord account to a `users` row. A user may have at most one Discord identity.
+Links a Discord account to a `users` row. Supports unlinking — a row is soft-deleted via `unlinked_at` rather than removed, allowing re-linking later.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | `SERIAL` | PK |
-| `discord_id` | `BIGINT` | Unique Discord snowflake |
+| `discord_id` | `BIGINT` | Discord snowflake |
 | `user_id` | `INT` | FK → `users(id)` |
 | `linked_at` | `TIMESTAMPTZ` | Default `now()` |
+| `unlinked_at` | `TIMESTAMPTZ` | `NULL` = currently active |
+
+**Unique indexes (partial, scoped to active rows where `unlinked_at IS NULL`):**
+- `one_active_discord_id` — a Discord account can only be linked to one user at a time.
+- `one_active_discord_per_user` — a user can only have one active Discord link at a time.
 
 **Constraints:**
 - Unlinking a Discord identity from a user who has no `name` set is blocked by `enforce_discord_user_name` trigger.
@@ -61,14 +66,14 @@ Tracks the alias a user goes by when completing work (e.g. the name that appears
 | `created_at` | `TIMESTAMPTZ` | Default `now()` |
 | `retired_at` | `TIMESTAMPTZ` | `NULL` = currently active |
 
-**Unique indexes:**
+**Unique indexes (partial, scoped to active rows where `retired_at IS NULL`):**
 - `one_active_alias` — no two users can hold the same active alias.
 - `one_active_alias_per_user` — a user can only have one active alias at a time.
 
 ---
 
 ### `roles`
-Custom capability labels (e.g. TL, TS, CLRD, QC, PR, RP).
+Custom capability labels (e.g. TL, TS, CLRD, QC, PR, RP) — used to describe what a user can do, not to control what they are assigned to.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -78,7 +83,7 @@ Custom capability labels (e.g. TL, TS, CLRD, QC, PR, RP).
 ---
 
 ### `user_roles`
-Which roles a user holds (their general capabilities, independent of any specific series).
+Which roles a user holds (their general capabilities, independent of any specific series or chapter).
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -110,6 +115,7 @@ Individual chapters belonging to a series.
 | `id` | `SERIAL` | PK |
 | `series_id` | `INT` | FK → `series(id)` |
 | `name` | `TEXT` | e.g. `"Ch 51.1"` |
+| `status` | `TEXT` | `'in_progress'` \| `'released'` \| `'dropped'`. Default `'in_progress'`. |
 | `added_at` | `TIMESTAMPTZ` | Default `now()` |
 
 Unique on `(series_id, name)`.
@@ -127,7 +133,7 @@ Custom task types that must be completed before a chapter can be released (e.g. 
 ---
 
 ### `task_dependencies`
-Defines which tasks must be done before others can start.
+Defines which tasks must be completed before others can start.
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -135,6 +141,18 @@ Defines which tasks must be done before others can start.
 | `depends_on_task_id` | `INT` | FK → `tasks(id)` |
 
 PK: `(task_id, depends_on_task_id)`
+
+---
+
+### `role_tasks`
+Maps which tasks a role is responsible for. Used to validate task assignments — when assigning a user to a series or chapter for a given task, the task must be mapped to one of the user's roles.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `role_id` | `INT` | FK → `roles(id)` |
+| `task_id` | `INT` | FK → `tasks(id)` |
+
+PK: `(role_id, task_id)`
 
 ---
 
@@ -167,28 +185,28 @@ Also has a composite FK on `(chapter_id, task_id)` → `chapter_tasks`.
 ---
 
 ### `series_assignments`
-Which users are assigned to a series in a given role (the "default" crew for a series).
+Which users are assigned to a series for a given task (the default crew for a series). Used to auto-populate `chapter_assignments` when a new chapter is created.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `user_id` | `INT` | FK → `users(id)` |
 | `series_id` | `INT` | FK → `series(id)` |
-| `role_id` | `INT` | FK → `roles(id)` |
+| `task_id` | `INT` | FK → `tasks(id)` |
 
-PK: `(user_id, series_id, role_id)`
+PK: `(user_id, series_id, task_id)`
 
 ---
 
 ### `chapter_assignments`
-Which users are assigned to a specific chapter in a given role. More granular than `series_assignments` and is the source of truth used when recording completions.
+Which users are assigned to a specific chapter for a given task. More granular than `series_assignments` and is the source of truth used when validating and recording task completions.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `user_id` | `INT` | FK → `users(id)` |
 | `chapter_id` | `INT` | FK → `chapters(id)` |
-| `role_id` | `INT` | FK → `roles(id)` |
+| `task_id` | `INT` | FK → `tasks(id)` |
 
-PK: `(user_id, chapter_id, role_id)`
+PK: `(user_id, chapter_id, task_id)`
 
 ---
 
@@ -197,7 +215,7 @@ PK: `(user_id, chapter_id, role_id)`
 | Trigger | Table | Event | Purpose |
 |---------|-------|-------|---------|
 | `enforce_supermanager_exists` | `users` | `UPDATE`, `DELETE` | Blocks the last supermanager from being removed |
-| `enforce_user_name` | `users` | `INSERT`, `UPDATE` | A user with no Discord identity must have a `name` |
+| `enforce_user_name` | `users` | `INSERT`, `UPDATE` | A user with no active Discord identity must have a `name` |
 | `enforce_discord_user_name` | `discord_identities` | `INSERT`, `UPDATE`, `DELETE` | Blocks unlinking Discord from a user who has no `name` |
 
 All triggers are `DEFERRABLE INITIALLY DEFERRED`.
@@ -206,7 +224,9 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED`.
 
 ## Key Design Notes
 
-- **User identity:** A user exists in `users` and is reachable via either `name` (webapp) or `discord_identities` (bot). Both can be active simultaneously.
+- **User identity:** A user exists in `users` and is reachable via either `name` (webapp) or an active `discord_identities` row (bot). Both can be active simultaneously.
 - **Aliases vs names:** `users.name` is the login/identity name; `user_aliases` is the public credit alias used in release history.
+- **Roles are informational:** `roles` and `user_roles` describe a user's general capabilities. `role_tasks` maps roles to tasks and is used only for assignment validation, not for authorization checks at completion time.
+- **Assignments are task-scoped:** `series_assignments` and `chapter_assignments` link users to specific tasks, not roles. This eliminates ambiguity when validating work progress events — the check is a direct lookup on `(user, chapter, task)`.
 - **Task tracking split:** `chapter_tasks.completed_at` is the live "done" flag. `chapter_task_completions` is the append-only audit log of who did the work.
-- **Soft deletes:** Users and aliases are never hard-deleted — `left_at` / `retired_at` mark deactivation, preserving historical completion records.
+- **Soft deletes:** Users, aliases, and Discord identities are never hard-deleted — `left_at`, `retired_at`, and `unlinked_at` mark deactivation, preserving historical completion records.

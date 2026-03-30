@@ -46,10 +46,13 @@ void Commands::setAlias(Bot &bot, const dpp::slashcommand_t &event) {
     auto constraint = Db::Utils::extractConstraintName(e);
     if(constraint == "one_active_alias") {
       event.edit_original_response(dpp::message("This alias is already being used"));
-    };
-    if(constraint == "one_active_alias_per_user") {
+    } else if(constraint == "one_active_alias_per_user") {
       event.edit_original_response(dpp::message("You already have an alias"));
-    };
+    } else {
+      std::cerr << "Alias for user (" << discord_id << ") " << "failed to be set due to exception: " << e.what() << std::endl;
+      event.edit_original_response(dpp::message("Unable to set alias. Contact the administrator to resolve this issue"));
+    }
+
   } catch(const std::exception &e) {
     std::cerr << "Alias for user (" << discord_id << ") " << "failed to be set due to exception: " << e.what() << std::endl;
     event.edit_original_response(dpp::message("Unable to set alias. Contact the administrator to resolve this issue"));

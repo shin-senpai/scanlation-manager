@@ -50,6 +50,6 @@ std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id
       result[0]["display_name"].as<std::string>(),
       result[0]["is_manager"].as<bool>(),
       result[0]["joined_at"].as<std::string>(),
-      result[0]["left_at"].as<std::string>(),
+      result[0]["left_at"].is_null() ? std::nullopt : std::make_optional(result[0]["left_at"].as<std::string>()),
       result[0]["is_supermanager"].as<bool>()};
 }

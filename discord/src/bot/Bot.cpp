@@ -131,7 +131,7 @@ Bot::Bot(ConfigManager &cfg)
         try {
           input = std::get<std::string>(option.value);
         } catch(std::exception &e) {
-          std::cerr << "Failed to get option's value for autocomplete event: " + event.name << std::endl;
+          std::cerr << "Failed to get option's value for autocomplete event: " << event.name << " due to exception: " << e.what() << std::endl;
         }
         it->second.autocomplete_handler(option.name, input, event);
         return;

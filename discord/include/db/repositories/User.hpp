@@ -17,8 +17,7 @@ public:
   int create(
       pqxx::work &txn,
       const std::string_view &display_name,
-      bool is_manager = false,
-      bool is_supermanager = false);
+      Permission permission_level = Permission::standard);
 
   std::vector<User> listUsers(pqxx::read_transaction &txn);
 

@@ -4,12 +4,12 @@
 // User Defined Includes
 #include "models/ModelUser.hpp"
 
-int UserRepository::create(pqxx::work &txn, const std::string_view &display_name, bool is_manager, bool is_supermanager) {
+int UserRepository::create(pqxx::work &txn, const std::string_view &display_name, Permission permission_level) {
   auto result = txn.exec(
-      "INSERT INTO users (display_name, is_manager, is_supermanager) VALUES ($1, $2, $3) RETURNING id",
-      pqxx::params{txn, display_name, is_manager, is_supermanager});
+      "INSERT INTO users (display_name, permission_level) VALUES ($1, $2) RETURNING id",
+      pqxx::params{txn, display_name, static_cast<int>(permission_level)});
 
-  return result[0][0].as<int>();
+  return result[0]["id"].as<int>();
 }
 
 std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
@@ -25,10 +25,9 @@ std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
         results[row]["id"].as<int>(),
         results[row]["name"].is_null() ? std::nullopt : std::make_optional(results[row]["name"].as<std::string>()),
         results[row]["display_name"].as<std::string>(),
-        results[row]["is_manager"].as<bool>(),
         results[row]["joined_at"].as<std::string>(),
         results[row]["left_at"].is_null() ? std::nullopt : std::make_optional(results[row]["left_at"].as<std::string>()),
-        results[row]["is_supermanager"].as<bool>());
+        static_cast<Permission>(results[row]["permission_level"].as<int>()));
   }
 
   return users;
@@ -36,8 +35,7 @@ std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
 
 std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id) {
   auto result = txn.exec(
-      "SELECT id, name, display_name, is_manager, is_supermanager "
-      "FROM users WHERE id = $1",
+      "SELECT * FROM users WHERE id = $1",
       pqxx::params{txn, id});
 
   if(result.empty()) {
@@ -48,8 +46,7 @@ std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id
       result[0]["id"].as<int>(),
       result[0]["name"].is_null() ? std::nullopt : std::make_optional(result[0][1].as<std::string>()),
       result[0]["display_name"].as<std::string>(),
-      result[0]["is_manager"].as<bool>(),
       result[0]["joined_at"].as<std::string>(),
       result[0]["left_at"].is_null() ? std::nullopt : std::make_optional(result[0]["left_at"].as<std::string>()),
-      result[0]["is_supermanager"].as<bool>()};
+      static_cast<Permission>(result[0]["permission_level"].as<int>())};
 }

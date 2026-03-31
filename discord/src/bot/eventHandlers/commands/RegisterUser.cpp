@@ -4,6 +4,7 @@
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "db/DbSession.hpp"
+#include "types/Permission.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/User.hpp"
 
@@ -37,7 +38,7 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     if(!first_user) {
       user_id = user_repo.create(session.wtx(), display_name);
     } else {
-      user_id = user_repo.create(session.wtx(), display_name, true, true);
+      user_id = user_repo.create(session.wtx(), display_name, Permission::supermanager);
     }
     identity_repo.create(session.wtx(), discord_id, user_id);
 

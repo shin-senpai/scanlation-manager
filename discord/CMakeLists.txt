@@ -20,6 +20,7 @@ set(DPP_USE_EXTERNAL_JSON ON)
 FetchContent_Declare(
     dpp
     URL https://github.com/brainboxdotcc/DPP/archive/refs/tags/v10.1.4.tar.gz
+    URL_HASH SHA256=f11b6d3fc5cc8febcf672b573ca74293ead6c6ea48a66ac0316ab9a5cbd09441
 )
 FetchContent_MakeAvailable(dpp)
 add_library(dpp::dpp ALIAS dpp)
@@ -27,7 +28,7 @@ add_library(dpp::dpp ALIAS dpp)
 FetchContent_Declare(
     libpqxx
     GIT_REPOSITORY https://github.com/jtv/libpqxx.git
-    GIT_TAG        8.0.0
+    GIT_TAG        fd7758fcdbf1bc7278d85d525de061acfb412d94
     GIT_SHALLOW    TRUE
 )
 set(SKIP_BUILD_TEST ON CACHE BOOL "" FORCE)

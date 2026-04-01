@@ -4,9 +4,9 @@
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "db/DbSession.hpp"
-#include "types/Permission.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/User.hpp"
+#include "types/Permission.hpp"
 
 // Standard Includes
 #include <cstdint>
@@ -29,10 +29,9 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     DiscordIdentityRepository identity_repo;
 
     bool first_user{false};
-    if(!user_repo.listUsers(session.rtx()).size()) {
+    if(!user_repo.listUsers(session.wtx()).size()) {
       first_user = true;
     }
-    session.closeTx();
 
     int user_id;
     if(!first_user) {

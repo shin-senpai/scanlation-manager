@@ -15,11 +15,11 @@ public:
   // Creates a user with only display_name set (Discord registration path).
   // Returns the new user's id.
   int create(
-      pqxx::work &txn,
+      pqxx::transaction_base &txn,
       const std::string_view &display_name,
       Permission permission_level = Permission::standard);
 
-  std::vector<User> listUsers(pqxx::read_transaction &txn);
+  std::vector<User> listUsers(pqxx::transaction_base &txn);
 
-  std::optional<User> findById(pqxx::read_transaction &txn, int id);
+  std::optional<User> findById(pqxx::transaction_base &txn, int id);
 };

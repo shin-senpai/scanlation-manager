@@ -4,7 +4,7 @@
 // User Defined Includes
 #include "models/ModelUser.hpp"
 
-int UserRepository::create(pqxx::work &txn, const std::string_view &display_name, Permission permission_level) {
+int UserRepository::create(pqxx::transaction_base &txn, const std::string_view &display_name, Permission permission_level) {
   auto result = txn.exec(
       "INSERT INTO users (display_name, permission_level) VALUES ($1, $2) RETURNING id",
       pqxx::params{txn, display_name, static_cast<int>(permission_level)});
@@ -12,7 +12,7 @@ int UserRepository::create(pqxx::work &txn, const std::string_view &display_name
   return result[0]["id"].as<int>();
 }
 
-std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
+std::vector<User> UserRepository::listUsers(pqxx::transaction_base &txn) {
   auto results = txn.exec(
       "SELECT * FROM users");
 
@@ -33,7 +33,7 @@ std::vector<User> UserRepository::listUsers(pqxx::read_transaction &txn) {
   return users;
 }
 
-std::optional<User> UserRepository::findById(pqxx::read_transaction &txn, int id) {
+std::optional<User> UserRepository::findById(pqxx::transaction_base &txn, int id) {
   auto result = txn.exec(
       "SELECT * FROM users WHERE id = $1",
       pqxx::params{txn, id});

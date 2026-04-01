@@ -9,9 +9,9 @@
 
 class UserAliasesRepository {
 public:
-  void create(pqxx::work &txn, int user_id, std::string &alias);
+  void create(pqxx::transaction_base &txn, int user_id, std::string &alias);
 
-  std::optional<std::string> read(pqxx::read_transaction &txn, int user_id);
+  std::optional<std::string> read(pqxx::transaction_base &txn, int user_id);
   
-  void retire(pqxx::work &txn, int user_id);
+  void retire(pqxx::transaction_base &txn, int user_id);
 };

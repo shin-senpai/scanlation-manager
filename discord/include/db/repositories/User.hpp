@@ -2,6 +2,7 @@
 
 // User Defined Includes
 #include "models/ModelUser.hpp"
+#include "types/Permission.hpp"
 
 // Standard Includes
 #include <optional>
@@ -22,4 +23,6 @@ public:
   std::vector<User> listUsers(pqxx::transaction_base &txn);
 
   std::optional<User> findById(pqxx::transaction_base &txn, int id);
+
+  std::optional<Permission> getPermissionLevel(pqxx::transaction_base &txn, int id);
 };

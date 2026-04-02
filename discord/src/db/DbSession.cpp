@@ -14,7 +14,7 @@ DbSession::~DbSession() {
 
 pqxx::work &DbSession::wtx() {
   if(m_rtxn) {
-    throw std::logic_error("read tx already active");
+    throw std::logic_error("You are trying to use a write_tx when a read_tx is already active");
   }
   if(!m_wtxn) {
     m_wtxn.emplace(*m_conn);
@@ -24,7 +24,7 @@ pqxx::work &DbSession::wtx() {
 
 pqxx::read_transaction &DbSession::rtx() {
   if(m_wtxn) {
-    throw std::logic_error("write tx already active");
+    throw std::logic_error("You are trying to use a read_tx when a write_tx is already active");
   }
   if(!m_rtxn) {
     m_rtxn.emplace(*m_conn);

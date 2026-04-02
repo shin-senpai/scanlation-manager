@@ -7,6 +7,7 @@
 
 // Standard Includes
 #include <cstdint>
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -99,8 +100,8 @@ Bot::Bot(ConfigManager &cfg)
 
       // Automatically adds all commands defined in the commands map to the
       // slash_cmds vector to be registered in bulk
-      for(const auto &[name, cmd_info] : m_commands) {
-        dpp::slashcommand cmd(name, cmd_info.description, m_core.me.id);
+      for(const auto &[cmd_name, cmd_info] : m_commands) {
+        dpp::slashcommand cmd(cmd_name, cmd_info.description, m_core.me.id);
         for(const auto &opt : cmd_info.options) {
           cmd.add_option(opt);
         }
@@ -126,7 +127,12 @@ Bot::Bot(ConfigManager &cfg)
 
     for(const auto &option : event.options) {
       if(option.focused) {
-        std::string input = std::get<std::string>(option.value);
+        std::string input{};
+        try {
+          input = std::get<std::string>(option.value);
+        } catch(std::exception &e) {
+          std::cerr << "Failed to get option's value for autocomplete event: " << event.name << " due to exception: " << e.what() << std::endl;
+        }
         it->second.autocomplete_handler(option.name, input, event);
         return;
       }

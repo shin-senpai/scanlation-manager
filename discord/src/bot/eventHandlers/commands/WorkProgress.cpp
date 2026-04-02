@@ -22,7 +22,7 @@ void Commands::workProgress(const dpp::slashcommand_t &event) {
   update.staff_name = event.command.usr.username;
 }
 
-void Commands::workProgressAutocomplete(Bot &bot, const std::string &option_name, const std::string &input, const dpp::autocomplete_t &event) {
+void Commands::workProgressAutocomplete(Bot &bot, const std::string_view &option_name, const std::string_view &input, const dpp::autocomplete_t &event) {
   dpp::interaction_response r(dpp::ir_autocomplete_reply);
   std::vector<std::string> series = {"One", "Two"};
   std::vector<std::string> chapters = {"1", "2"};

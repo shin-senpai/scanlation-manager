@@ -6,6 +6,7 @@
 #include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/User.hpp"
+#include "types/Permission.hpp"
 
 // Standard Includes
 #include <cstdint>
@@ -17,6 +18,7 @@
 #include <pqxx/pqxx>
 
 void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
+  event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
   const std::string display_name = event.command.usr.username;
 
@@ -26,16 +28,27 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     UserRepository user_repo;
     DiscordIdentityRepository identity_repo;
 
-    const int user_id = user_repo.create(session.tx(), display_name);
-    identity_repo.create(session.tx(), discord_id, user_id);
+    bool first_user{false};
+    if(!user_repo.listUsers(session.wtx()).size()) {
+      first_user = true;
+    }
+
+    int user_id;
+    if(!first_user) {
+      user_id = user_repo.create(session.wtx(), display_name);
+    } else {
+      user_id = user_repo.create(session.wtx(), display_name, Permission::supermanager);
+    }
+    identity_repo.create(session.wtx(), discord_id, user_id);
 
     session.commit();
 
-    event.reply("You've been registered! Welcome, " + display_name + ".");
+    event.edit_original_response(dpp::message("You've been registered! Welcome, " + display_name + "."));
 
   } catch(const pqxx::unique_violation &) {
-    event.reply("You're already registered.");
-  } catch(const std::exception &) {
-    event.reply("Registration failed. Please try again later.");
+    event.edit_original_response(dpp::message("You're already registered."));
+  } catch(const std::exception &e) {
+    event.edit_original_response(dpp::message("Registration failed. Please try again later."));
+    std::cerr << "User Registration failed due to exception: " << e.what() << std::endl;
   }
 }

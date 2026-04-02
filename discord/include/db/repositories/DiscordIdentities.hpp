@@ -11,7 +11,7 @@ class DiscordIdentityRepository {
 public:
   // Links a Discord user to an existing users row.
   // Throws pqxx::unique_violation if discord_id is already registered.
-  void create(pqxx::work &txn, int64_t discord_id, int user_id);
+  void create(pqxx::transaction_base &txn, int64_t discord_id, int user_id);
 
-  std::optional<int> findUserIdByDiscordId(pqxx::work &txn, int64_t discord_id);
+  std::optional<int> findUserIdByDiscordId(pqxx::transaction_base &txn, int64_t discord_id);
 };

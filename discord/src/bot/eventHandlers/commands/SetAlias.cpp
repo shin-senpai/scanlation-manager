@@ -7,7 +7,6 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
-#include "db/ConnectionPool.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/UserAliases.hpp"

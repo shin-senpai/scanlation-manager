@@ -72,7 +72,7 @@ void Triggers::workProgress(const dpp::message_create_t &event) {
     start = end + 1;
   }
 
-  auto name = ChannelUtils::extractChannelName(update.series_channel);
+  auto name = BotUtils::extractChannelName(update.series_channel);
   update.series_channel_name = name.value_or("");
 
   std::string response =

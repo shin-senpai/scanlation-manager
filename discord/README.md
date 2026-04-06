@@ -25,10 +25,10 @@ scanlation-manager/
 | ✅ | `/ping` — Health check command |
 | ✅ | `/register` — Register a Discord user as a team member |
 | ✅ | `/set-progress-channel` — Designate a channel for work progress messages |
+| ✅ | `/set-alias` — Set a display alias for release credits |
 | ✅ | Work progress message trigger — Parses and echoes structured progress updates |
-| 🚧 | `/work-update` — Slash command to submit a work progress update (autocomplete for series/chapter/task in progress) |
+| 🚧 | `/work-update` — Slash command to submit a work progress update (autocomplete hardcoded) |
 | 🚧 | Google Sheets integration — Sync progress data to a spreadsheet |
-| 🚧 | Dynamic autocomplete — Series, chapters, and tasks currently hardcoded |
 
 ---
 
@@ -38,30 +38,56 @@ scanlation-manager/
 discord/
 ├── main.cpp
 ├── bot/
-│   ├── Bot.hpp / Bot.cpp                      # Core bot class, command & trigger registration
-│   └── eventHandlers/
-│       ├── commands/
-│       │   ├── Ping.hpp / Ping.cpp
-│       │   ├── RegisterUser.hpp / RegisterUser.cpp
-│       │   ├── SetProgressChannel.hpp / SetProgressChannel.cpp
-│       │   └── WorkProgress.hpp / WorkProgress.cpp
-│       ├── triggers/
-│       │   └── WorkProgress.hpp / WorkProgress.cpp
-│       └── utils/
-│           └── ChannelUtils.hpp / ChannelUtils.cpp  # Channel mention parsing helpers
+│   ├── Bot.hpp / Bot.cpp                          # Core bot class, command & trigger registration
+│   ├── eventHandlers/
+│   │   ├── commands/
+│   │   │   ├── Ping.hpp / Ping.cpp
+│   │   │   ├── RegisterUser.hpp / RegisterUser.cpp
+│   │   │   ├── SetAlias.hpp / SetAlias.cpp
+│   │   │   ├── SetProgressChannel.hpp / SetProgressChannel.cpp
+│   │   │   └── WorkProgress.hpp / WorkProgress.cpp
+│   │   └── triggers/
+│   │       └── WorkProgress.hpp / WorkProgress.cpp
+│   └── utils/
+│       └── ChannelUtils.hpp / ChannelUtils.cpp    # Channel mention parsing helpers
 ├── db/
-│   ├── DbSession.hpp / DbSession.cpp          # Transaction session (RAII)
-│   ├── ConnectionPool.hpp / ConnectionPool.cpp # Thread-safe connection pooling
-│   └── repositories/
-│       ├── User.hpp / User.cpp                # User CRUD
-│       ├── DiscordIdentities.hpp / DiscordIdentities.cpp  # Discord ID ↔ user linking
-│       └── UserAliases.hpp / UserAliases.cpp  # User alias create/read/retire
-├── models/
-│   ├── ModelUser.hpp                          # User entity struct
-│   └── ModelWorkProgress.hpp                  # WorkProgress data struct
+│   ├── DbSession.hpp / DbSession.cpp              # Transaction session (RAII)
+│   ├── ConnectionPool.hpp / ConnectionPool.cpp    # Thread-safe connection pooling
+│   ├── repositories/                              # One file pair per DB table
+│   │   ├── User.hpp / User.cpp
+│   │   ├── DiscordIdentities.hpp / DiscordIdentities.cpp
+│   │   ├── UserAliases.hpp / UserAliases.cpp
+│   │   ├── UserCredentials.hpp / UserCredentials.cpp
+│   │   ├── UserRoles.hpp / UserRoles.cpp
+│   │   ├── Roles.hpp / Roles.cpp
+│   │   ├── RoleTasks.hpp / RoleTasks.cpp
+│   │   ├── Tasks.hpp / Tasks.cpp
+│   │   ├── TaskDependencies.hpp / TaskDependencies.cpp
+│   │   ├── Series.hpp / Series.cpp
+│   │   ├── Chapters.hpp / Chapters.cpp
+│   │   ├── SeriesAssignments.hpp / SeriesAssignments.cpp
+│   │   └── ChapterAssignments.hpp / ChapterAssignments.cpp
+│   └── utils/
+│       └── PqxxErrors.hpp / PqxxErrors.cpp        # Constraint name extraction from pqxx exceptions
+├── models/                                        # Plain data structs (no logic)
+│   ├── ModelUser.hpp
+│   ├── ModelSeries.hpp
+│   ├── ModelChapter.hpp
+│   ├── ModelRole.hpp
+│   ├── ModelTask.hpp
+│   ├── ModelTaskDependency.hpp
+│   ├── ModelRoleTask.hpp
+│   ├── ModelUserRole.hpp
+│   ├── ModelSeriesAssignment.hpp
+│   ├── ModelChapterAssignment.hpp
+│   └── ModelWorkProgress.hpp
+├── types/                                         # Shared enums
+│   ├── Permission.hpp
+│   ├── SeriesStatus.hpp
+│   └── ChapterStatus.hpp
 └── utils/
-    ├── ConfigManager.hpp / ConfigManager.cpp  # Thread-safe JSON config read/write
-    └── HttpUtils.hpp / HttpUtils.cpp          # libcurl HTTP GET/POST wrappers
+    ├── ConfigManager.hpp / ConfigManager.cpp      # Thread-safe JSON config read/write
+    └── HttpUtils.hpp / HttpUtils.cpp              # libcurl HTTP GET/POST wrappers
 ```
 
 ---
@@ -79,15 +105,7 @@ The bot reads from a `config.json` file at the working directory. The following 
 | `gsheet_auth_token` | ❌ | `string` | Auth token for Google Sheets private API (future use) |
 | `gsheet_priv_api_url` | ❌ | `string` | Endpoint URL for Google Sheets private API (future use) |
 
-**Example `config.json`:**
-```json
-{
-  "discord_bot_token": "YOUR_TOKEN_HERE",
-  "guild_id": 123456789012345678,
-  "database": "host=localhost port=5432 dbname=scanlation user=postgres password=yourpassword",
-  "work_progress_channel": 987654321098765432
-}
-```
+Copy `config.json.example` and fill in your values.
 
 ---
 
@@ -113,12 +131,12 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 
 ## Building
 
-> Ensure all dependencies (D++, libpqxx, libcurl) are installed and available to CMake. The database must also be running and migrated before starting the bot (see `db/`).
+> D++ and libpqxx are fetched automatically by CMake on first build. You only need to have `nlohmann_json` and `libcurl` installed on the system. The database must also be running and migrated before starting the bot (see `db/`).
 
 ```bash
 cd discord
-cmake -B build
-cmake --build build
+cmake --preset default
+cmake --build --preset default
 ./build/scanlation-manager
 ```
 
@@ -151,6 +169,9 @@ Registers the calling Discord user as a scanlation team member. Creates a user r
 ### `/set-progress-channel [channel]`
 Sets the channel where the bot will watch for work progress messages. The setting is persisted to `config.json`.
 
+### `/set-alias [alias]`
+Sets a display alias for the calling user, used in release credits. Enforces uniqueness — no two active users can share an alias, and each user can only have one active alias at a time.
+
 ### `/work-update` *(in progress)*
 Allows staff to submit a work update via slash command with autocomplete for series, chapter, and task. Currently the autocomplete options are hardcoded placeholders.
 
@@ -160,4 +181,4 @@ Allows staff to submit a work update via slash command with autocomplete for ser
 
 - Commands are registered per-guild (not globally) for faster propagation during development.
 - The `ConfigManager` is thread-safe and persists changes to disk on every `set` call.
-- The database layer uses a `ConnectionPool` (accessed via `Bot::getPool()`) with RAII transaction sessions; all queries use parameterized statements.
+- The database layer uses a `ConnectionPool` (accessed via `Bot::getPool()`). Callers construct a `DbSession` from the pool directly — `DbSession session(bot.getPool())` — which provides `wtx()` (write transaction) and `rtx()` (read transaction). All queries use parameterized statements.

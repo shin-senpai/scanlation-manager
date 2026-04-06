@@ -14,14 +14,13 @@ Core identity record. Represents anyone who can use the platform.
 | `id` | `SERIAL` | PK |
 | `name` | `TEXT` | Unique webapp username. Nullable — Discord-only users don't need one until they set it. Once set, never deleted (prevents name recycling). |
 | `display_name` | `TEXT` | Human-facing name |
-| `is_manager` | `BOOLEAN` | Default `false` |
-| `is_supermanager` | `BOOLEAN` | Default `false`. At least one must always exist (enforced by trigger). |
+| `permission_level` | `SMALLINT` | `0` = member, `1` = manager, `2` = supermanager. Default `0`. |
 | `joined_at` | `TIMESTAMPTZ` | Default `now()` |
 | `left_at` | `TIMESTAMPTZ` | `NULL` = currently active |
 
 **Constraints:**
 - A user must have either a `name` or an active `discord_identities` row — enforced by `enforce_user_name` trigger.
-- Removing the last supermanager is blocked by `enforce_supermanager_exists` trigger.
+- At least one active user with `permission_level = 2` must always exist — enforced by `enforce_supermanager_exists` trigger.
 
 ---
 
@@ -115,8 +114,9 @@ Individual chapters belonging to a series.
 | `id` | `SERIAL` | PK |
 | `series_id` | `INT` | FK → `series(id)` |
 | `name` | `TEXT` | e.g. `"Ch 51.1"` |
-| `status` | `TEXT` | `'in_progress'` \| `'released'` \| `'dropped'`. Default `'in_progress'`. |
+| `status` | `TEXT` | `'in_progress'` \| `'released'` \| `'dropped'` \| `'hiatus'`. Default `'in_progress'`. |
 | `added_at` | `TIMESTAMPTZ` | Default `now()` |
+| `closed_at` | `TIMESTAMPTZ` | `NULL` = still in progress |
 
 Unique on `(series_id, name)`.
 
@@ -156,34 +156,6 @@ PK: `(role_id, task_id)`
 
 ---
 
-### `chapter_tasks`
-The to-do list for each chapter — one row per `(chapter, task)` pair. Auto-populated when a chapter is created or a new task is added.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `chapter_id` | `INT` | FK → `chapters(id)` |
-| `task_id` | `INT` | FK → `tasks(id)` |
-| `completed_at` | `TIMESTAMPTZ` | `NULL` = not yet done. This is the canonical "is this task done?" flag. |
-
-PK: `(chapter_id, task_id)`
-
----
-
-### `chapter_task_completions`
-Immutable history of who completed each chapter task and when. Populated from `chapter_assignments` at the time of completion.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `chapter_id` | `INT` | FK → `chapters(id)` |
-| `task_id` | `INT` | FK → `tasks(id)` |
-| `user_id` | `INT` | FK → `users(id)` |
-| `completed_at` | `TIMESTAMPTZ` | Default `now()` |
-
-PK: `(chapter_id, task_id, user_id)`
-Also has a composite FK on `(chapter_id, task_id)` → `chapter_tasks`.
-
----
-
 ### `series_assignments`
 Which users are assigned to a series for a given task (the default crew for a series). Used to auto-populate `chapter_assignments` when a new chapter is created.
 
@@ -198,13 +170,14 @@ PK: `(user_id, series_id, task_id)`
 ---
 
 ### `chapter_assignments`
-Which users are assigned to a specific chapter for a given task. More granular than `series_assignments` and is the source of truth used when validating and recording task completions.
+Which users are assigned to a specific chapter for a given task. The to-do list for a chapter is rows where `completed_at IS NULL`; completion history is where `completed_at IS NOT NULL`.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `user_id` | `INT` | FK → `users(id)` |
 | `chapter_id` | `INT` | FK → `chapters(id)` |
 | `task_id` | `INT` | FK → `tasks(id)` |
+| `completed_at` | `TIMESTAMPTZ` | `NULL` = not yet done |
 
 PK: `(user_id, chapter_id, task_id)`
 
@@ -214,7 +187,7 @@ PK: `(user_id, chapter_id, task_id)`
 
 | Trigger | Table | Event | Purpose |
 |---------|-------|-------|---------|
-| `enforce_supermanager_exists` | `users` | `UPDATE`, `DELETE` | Blocks the last supermanager from being removed |
+| `enforce_supermanager_exists` | `users` | `INSERT`, `UPDATE`, `DELETE` | Ensures at least one active user with `permission_level = 2` always exists |
 | `enforce_user_name` | `users` | `INSERT`, `UPDATE` | A user with no active Discord identity must have a `name` |
 | `enforce_discord_user_name` | `discord_identities` | `INSERT`, `UPDATE`, `DELETE` | Blocks unlinking Discord from a user who has no `name` |
 
@@ -226,7 +199,8 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED`.
 
 - **User identity:** A user exists in `users` and is reachable via either `name` (webapp) or an active `discord_identities` row (bot). Both can be active simultaneously.
 - **Aliases vs names:** `users.name` is the login/identity name; `user_aliases` is the public credit alias used in release history.
-- **Roles are informational:** `roles` and `user_roles` describe a user's general capabilities. `role_tasks` maps roles to tasks and is used only for assignment validation, not for authorization checks at completion time.
+- **Permissions:** `permission_level` is a single integer (`0`/`1`/`2`) replacing the old `is_manager`/`is_supermanager` boolean flags. Enforced via a `CHECK` constraint.
+- **Roles:** `roles` and `user_roles` describe a user's general capabilities. `role_tasks` maps roles to tasks and is used only for assignment validation.
 - **Assignments are task-scoped:** `series_assignments` and `chapter_assignments` link users to specific tasks, not roles. This eliminates ambiguity when validating work progress events — the check is a direct lookup on `(user, chapter, task)`.
-- **Task tracking split:** `chapter_tasks.completed_at` is the live "done" flag. `chapter_task_completions` is the append-only audit log of who did the work.
+- **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion record. To-do list = `WHERE completed_at IS NULL`; completion history = `WHERE completed_at IS NOT NULL`.
 - **Soft deletes:** Users, aliases, and Discord identities are never hard-deleted — `left_at`, `retired_at`, and `unlinked_at` mark deactivation, preserving historical completion records.

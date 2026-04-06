@@ -1,6 +1,7 @@
 #pragma once
 
 // User Defined Includes
+#include "db/ConnectionPool.hpp"
 #include "models/ModelUser.hpp"
 #include "types/Permission.hpp"
 
@@ -23,6 +24,8 @@ public:
   std::vector<User> listUsers(pqxx::transaction_base &txn);
 
   std::optional<User> findById(pqxx::transaction_base &txn, int id);
+
+  void setPermissionLevel(pqxx::transaction_base &txn, int id, Permission permission_level);
 
   std::optional<Permission> getPermissionLevel(pqxx::transaction_base &txn, int id);
 };

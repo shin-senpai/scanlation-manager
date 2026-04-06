@@ -4,6 +4,8 @@
 // User Defined Includes
 #include "models/ModelUser.hpp"
 #include "types/Permission.hpp"
+
+// Standard Includes
 #include <optional>
 
 int UserRepository::create(pqxx::transaction_base &txn, const std::string_view &display_name, Permission permission_level) {
@@ -51,6 +53,12 @@ std::optional<User> UserRepository::findById(pqxx::transaction_base &txn, int id
       result[0]["joined_at"].as<std::string>(),
       result[0]["left_at"].is_null() ? std::nullopt : std::make_optional(result[0]["left_at"].as<std::string>()),
       static_cast<Permission>(result[0]["permission_level"].as<int>())};
+}
+
+void UserRepository::setPermissionLevel(pqxx::transaction_base &txn, int id, Permission permission_level) {
+  txn.exec(
+      "UPDATE users SET permission_level = $2 WHERE id = $1",
+      pqxx::params(txn, id, static_cast<int>(permission_level)));
 }
 
 std::optional<Permission> UserRepository::getPermissionLevel(pqxx::transaction_base &txn, int id) {

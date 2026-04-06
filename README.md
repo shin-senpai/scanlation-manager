@@ -20,14 +20,14 @@ The database schema models all of the following. Bot commands and web UI to expo
 
 | Status | Feature |
 |--------|---------|
-| ✅ schema, ✅ bot | User registration — link Discord identities to team member accounts |
-| ✅ schema, 🚧 bot | User permissions — supermanager and manager flags |
-| ✅ schema, 🚧 bot | Custom roles — define capabilities for team members |
-| ✅ schema, ✅ db layer, 🚧 bot | User aliases — track contributors under different names over time |
-| ✅ schema, 🚧 bot | Custom tasks — define the steps required before a chapter can be released |
-| ✅ schema, 🚧 bot | Task dependencies — specify which tasks block other tasks |
-| ✅ schema, 🚧 bot | Series & chapter tracking — track active series and per-chapter assignments |
-| ✅ schema, 🚧 bot | Contribution history — record who completed which task, for which chapter, under which alias, and when |
+| ✅ schema, ✅ db layer, ✅ bot | User registration — link Discord identities to team member accounts |
+| ✅ schema, ✅ db layer, ✅ bot | User aliases — track contributors under different names over time |
+| ✅ schema, ✅ db layer, 🚧 bot | User permissions — member, manager, and supermanager levels |
+| ✅ schema, ✅ db layer, 🚧 bot | Custom roles — define capabilities for team members |
+| ✅ schema, ✅ db layer, 🚧 bot | Custom tasks — define the steps required before a chapter can be released |
+| ✅ schema, ✅ db layer, 🚧 bot | Task dependencies — specify which tasks block other tasks |
+| ✅ schema, ✅ db layer, 🚧 bot | Series & chapter tracking — track active series and per-chapter assignments |
+| ✅ schema, ✅ db layer, 🚧 bot | Contribution history — record who completed which task, for which chapter, and when |
 | 🚧 bot | To-do lists — see which tasks are outstanding and who is responsible |
 | 🚧 bot | Release summaries — query releases with sorting and filtering |
 
@@ -89,7 +89,8 @@ docker compose up -d
 ```sh
 cd discord
 cp config.json.example config.json  # fill in your bot token etc.
-cmake --preset default && cmake --build --preset default
+cmake --preset default
+cmake --build --preset default
 ./build/scanlation-manager
 ```
 

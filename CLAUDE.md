@@ -30,8 +30,8 @@ scanlation-manager/
 ### Build
 ```bash
 cd discord
-cmake -B build
-cmake --build build
+cmake --preset default
+cmake --build --preset default
 ./build/scanlation-manager   # config.json is auto-copied to build/ on build
 ```
 
@@ -55,18 +55,19 @@ discord/
 ├── include/
 │   ├── bot/
 │   │   ├── Bot.hpp
-│   │   └── eventHandlers/
-│   │       ├── commands/         # One header per slash command
-│   │       ├── triggers/         # One header per message trigger
-│   │       └── utils/
+│   │   ├── eventHandlers/
+│   │   │   ├── commands/         # One header per slash command
+│   │   │   └── triggers/         # One header per message trigger
+│   │   └── utils/                # BotUtils, ChannelUtils
 │   ├── db/
-│   │   ├── Db.hpp
 │   │   ├── DbSession.hpp
 │   │   ├── ConnectionPool.hpp
-│   │   └── repositories/        # One header per DB table/entity
-│   ├── models/                  # Plain data structs (no logic)
-│   └── utils/                   # ConfigManager, HttpUtils
-└── src/                         # Mirrors include/ structure
+│   │   ├── repositories/         # One header per DB table/entity
+│   │   └── utils/                # PqxxErrors (constraint name extraction)
+│   ├── models/                   # Plain data structs (no logic)
+│   ├── types/                    # Shared enums: Permission, SeriesStatus, ChapterStatus
+│   └── utils/                    # ConfigManager, HttpUtils
+└── src/                          # Mirrors include/ structure
 ```
 
 ### Adding a New Slash Command
@@ -105,13 +106,22 @@ psql "$DATABASE_URL" -f db/migrations/002_add_supermanager.sql
 psql "$DATABASE_URL" -f db/migrations/003_add_user_credentials.sql
 psql "$DATABASE_URL" -f db/migrations/004_add_discord_identities.sql
 psql "$DATABASE_URL" -f db/migrations/005_enforce_webapp_name.sql
+psql "$DATABASE_URL" -f db/migrations/006_add_hiatus_to_series_check_constraint.sql
+psql "$DATABASE_URL" -f db/migrations/007_add_unlinked_at_to_discord_identities.sql
+psql "$DATABASE_URL" -f db/migrations/008_add_chapter_status.sql
+psql "$DATABASE_URL" -f db/migrations/009_role_task_mapping_and_assignment_refactor.sql
+psql "$DATABASE_URL" -f db/migrations/010_fix_supermanager_check.sql
+psql "$DATABASE_URL" -f db/migrations/011_replace_manager_flags_with_permission_level.sql
+psql "$DATABASE_URL" -f db/migrations/012_add_closed_at_to_chapters.sql
+psql "$DATABASE_URL" -f db/migrations/013_simplify_chapter_task_tracking.sql
+psql "$DATABASE_URL" -f db/migrations/014_add_hiatus_to_chapter_status.sql
 ```
 
 ### Key Schema Notes
 - `users.name` is nullable — users can exist with only a Discord identity
 - Every user must have either a `name` (webapp) or a row in `discord_identities` — enforced by a constraint trigger
 - At least one supermanager must always exist — enforced by a constraint trigger
-- `chapter_task_completions` preserves full history; `chapter_tasks.completed_at` is the canonical "is done" flag
+- `chapter_assignments.completed_at` is both the "done" flag and the completion record — `NULL` means outstanding, non-null means done
 
 ---
 
@@ -122,6 +132,7 @@ psql "$DATABASE_URL" -f db/migrations/005_enforce_webapp_name.sql
 | `/ping` | Done |
 | `/register` | Done |
 | `/set-progress-channel` | Done |
+| `/set-alias` | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

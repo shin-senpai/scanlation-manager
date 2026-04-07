@@ -64,7 +64,7 @@ Not yet implemented. The backend will expose the same data as the Discord bot th
 | Layer | Technology |
 |---|---|
 | Discord bot | C++20, [D++](https://dpp.dev/) v10.1.4 |
-| Database | PostgreSQL 16 (Docker) |
+| Database | PostgreSQL 18.3 (Docker) |
 | DB client (C++) | libpqxx 8.0.0 |
 | Build system | CMake 3.28+ |
 | Backend | TBD |

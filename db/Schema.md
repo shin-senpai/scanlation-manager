@@ -154,6 +154,8 @@ Maps which tasks a role is responsible for. Used to validate task assignments �
 
 PK: `(role_id, task_id)`
 
+**Index:** `idx_role_tasks_task_id` on `(task_id)` — supports `listByTask` lookups.
+
 ---
 
 ### `series_assignments`
@@ -166,6 +168,8 @@ Which users are assigned to a series for a given task (the default crew for a se
 | `task_id` | `INT` | FK → `tasks(id)` |
 
 PK: `(user_id, series_id, task_id)`
+
+**Index:** `idx_series_assignments_series_id` on `(series_id)` — supports `listBySeries` lookups.
 
 ---
 
@@ -180,6 +184,14 @@ Which users are assigned to a specific chapter for a given task. The to-do list 
 | `completed_at` | `TIMESTAMPTZ` | `NULL` = not yet done |
 
 PK: `(user_id, chapter_id, task_id)`
+
+**Index:** `idx_chapter_assignments_chapter_id` on `(chapter_id)` — supports `listByChapter` lookups.
+
+---
+
+### `task_dependencies` — additional index
+
+**Index:** `idx_task_dependencies_depends_on_task_id` on `(depends_on_task_id)` — supports `listDependentsOf` lookups. The PK `(task_id, depends_on_task_id)` only covers `listDependenciesOf`.
 
 ---
 

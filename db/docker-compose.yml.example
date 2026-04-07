@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres@sha256:78df81b1442dcc764c1104154da7162635e40cfffe67579c42a1c1b96dfc209c
+    image: postgres@sha256:ddbc320a9ad558c01c719248108e607eadde92fea799fec799028cfb2fab7319
     environment:
       POSTGRES_DB: scanlation_manager
       POSTGRES_USER: scanlation_manager
@@ -8,7 +8,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./migrations:/docker-entrypoint-initdb.d
 
 volumes:

@@ -8,12 +8,17 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <utility>
 
 // Third Party Includes
 #include <pqxx/pqxx>
 
 ConnectionPool::ConnectionPool(const std::string &connStr, size_t size) {
+  if (size == 0) {
+    throw std::invalid_argument("db_pool_size must be greater than 0");
+  }
+
   for(size_t i = 0; i < size; ++i) {
     m_pool.push(std::make_unique<pqxx::connection>(connStr));
   }

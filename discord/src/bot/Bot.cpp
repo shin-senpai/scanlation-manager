@@ -87,7 +87,7 @@ Bot::Bot(ConfigManager &cfg)
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
       m_config(cfg),
-      m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<int>("db_pool_size")) {
+      m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<size_t>("db_pool_size")) {
 
   m_core.on_log(dpp::utility::cout_logger());
 

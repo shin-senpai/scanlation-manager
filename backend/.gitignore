@@ -1,0 +1,11 @@
+# Build output
+bin/
+
+# Config & Secrets
+*.json
+
+# Environment
+.env
+
+# Secrets
+secrets/

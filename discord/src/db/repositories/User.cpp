@@ -70,14 +70,10 @@ void UserRepository::setPermissionLevel(pqxx::transaction_base &txn, int id, Per
       pqxx::params(txn, id, static_cast<int>(permission_level)));
 }
 
-std::optional<Permission> UserRepository::getPermissionLevel(pqxx::transaction_base &txn, int id) {
+Permission UserRepository::getPermissionLevel(pqxx::transaction_base &txn, int id) {
   auto result = txn.exec(
       "SELECT permission_level FROM users WHERE id = $1",
       pqxx::params(txn, id));
-
-  if(result.empty()) {
-    return std::nullopt;
-  }
 
   return static_cast<Permission>(result[0]["permission_level"].as<int>());
 }

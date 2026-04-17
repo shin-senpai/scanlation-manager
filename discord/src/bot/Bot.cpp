@@ -22,6 +22,9 @@
 #include "bot/eventHandlers/triggers/WorkProgress.hpp"
 
 // Commands
+#include "bot/eventHandlers/commands/AddRole.hpp"
+#include "bot/eventHandlers/commands/AddTask.hpp"
+#include "bot/eventHandlers/commands/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/Ping.hpp"
 #include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
@@ -56,6 +59,24 @@ void Bot::fillCommandMap() {
       "Set the alias that you want to use for credit",
       [this](const dpp::slashcommand_t &e) { Commands::setAlias(*this, e); },
       {dpp::command_option(dpp::co_string, "alias", "The Credit Name you want to use", true)}};
+
+  m_commands["add-role"] = {
+      "Create a new scanlation role",
+      [this](const dpp::slashcommand_t &e) { Commands::addRole(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the role", true)}};
+
+  m_commands["add-task"] = {
+      "Create a new task type",
+      [this](const dpp::slashcommand_t &e) { Commands::addTask(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the task", true)}};
+
+  m_commands["map-role-task"] = {
+      "Map a role to a task it is responsible for",
+      [this](const dpp::slashcommand_t &e) { Commands::mapRoleTask(*this, e); },
+      {
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+          dpp::command_option(dpp::co_string, "task", "Name of the task", true),
+      }};
 }
 
 void Bot::fillTriggerList() {

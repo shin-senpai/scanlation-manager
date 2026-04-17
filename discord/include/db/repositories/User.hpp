@@ -27,5 +27,5 @@ public:
 
   void setPermissionLevel(pqxx::transaction_base &txn, int id, Permission permission_level);
 
-  std::optional<Permission> getPermissionLevel(pqxx::transaction_base &txn, int id);
+  Permission getPermissionLevel(pqxx::transaction_base &txn, int id);
 };

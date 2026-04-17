@@ -15,12 +15,8 @@
  */
 
 int main(int argc, char const *argv[]) {
-  CurlGlobalManager::curlManagerInit();
-
-  ConfigManager config("config.json");
-
-  const std::string gsheet_auth_token = config.getOptional<std::string>("gsheet_auth_token");
-  const std::string gsheet_priv_api_url = config.getOptional<std::string>("gsheet_priv_api_url");
+  // const std::string gsheet_auth_token = config.getOptional<std::string>("gsheet_auth_token");
+  // const std::string gsheet_priv_api_url = config.getOptional<std::string>("gsheet_priv_api_url");
 
   // // --- GOOGLE SHEETS API TEST START ---
   // std::cout << "[Google Sheets] Testing connection..." << std::endl;
@@ -52,6 +48,8 @@ int main(int argc, char const *argv[]) {
   // // --- GOOGLE SHEETS API TEST END ---
 
   try {
+    CurlGlobalManager::curlManagerInit();
+    ConfigManager config("config.json");
     Bot scan_manager(config);
     scan_manager.start();
   } catch(const std::exception &e) {

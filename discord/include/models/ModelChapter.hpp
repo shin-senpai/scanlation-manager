@@ -10,6 +10,7 @@
 struct Chapter {
   int id;
   int series_id;
+  double number;
   std::string name;
   ChapterStatus status;
   std::string added_at;

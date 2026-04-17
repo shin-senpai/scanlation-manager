@@ -30,7 +30,7 @@ void Commands::setProgressChannel(Bot &bot, const dpp::slashcommand_t &event) {
     }
     const int64_t user_id = *maybe_user_id;
 
-    Permission permission_level = user_repo.getPermissionLevel(session.rtx(), user_id).value();
+    Permission permission_level = user_repo.getPermissionLevel(session.rtx(), user_id);
     if(permission_level < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action"));
       return;

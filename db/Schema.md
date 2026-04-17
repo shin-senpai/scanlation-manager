@@ -1,206 +1,263 @@
 # Database Schema
 
-PostgreSQL. Migrations are applied manually in order from `db/migrations/`.
+PostgreSQL. Migrations are applied manually in order from `db/migrations/`. The `citext` extension is required (enabled by migration 016).
 
 ---
 
 ## Tables
 
 ### `users`
+
 Core identity record. Represents anyone who can use the platform.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `name` | `TEXT` | Unique webapp username. Nullable — Discord-only users don't need one until they set it. Once set, never deleted (prevents name recycling). |
-| `display_name` | `TEXT` | Human-facing name |
-| `permission_level` | `SMALLINT` | `0` = member, `1` = manager, `2` = supermanager. Default `0`. |
-| `joined_at` | `TIMESTAMPTZ` | Default `now()` |
-| `left_at` | `TIMESTAMPTZ` | `NULL` = currently active |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `name` | `TEXT` | Yes | — | Unique webapp username. Nullable — Discord-only users don't need one. Once set, never deleted (prevents name recycling). |
+| `display_name` | `TEXT` | No | — | Human-facing name shown in the bot |
+| `permission_level` | `SMALLINT` | No | `0` | `0` = member, `1` = manager, `2` = supermanager |
+| `joined_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+| `left_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = currently active |
 
-**Constraints:**
-- A user must have either a `name` or an active `discord_identities` row — enforced by `enforce_user_name` trigger.
-- At least one active user with `permission_level = 2` must always exist — enforced by `enforce_supermanager_exists` trigger.
+**Check constraints:**
+- `permission_level IN (0, 1, 2)`
+
+**Unique constraints:**
+- `users_name_key` on `(name)` — webapp usernames are globally unique, even after a user leaves
+
+**Triggers:**
+- `enforce_supermanager_exists` — after any INSERT/UPDATE/DELETE, ensures at least one row exists with `permission_level = 2 AND left_at IS NULL`
+- `enforce_user_name` — after INSERT/UPDATE, ensures a user with no active `discord_identities` row must have `name` set
 
 ---
 
 ### `discord_identities`
-Links a Discord account to a `users` row. Supports unlinking — a row is soft-deleted via `unlinked_at` rather than removed, allowing re-linking later.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `discord_id` | `BIGINT` | Discord snowflake |
-| `user_id` | `INT` | FK → `users(id)` |
-| `linked_at` | `TIMESTAMPTZ` | Default `now()` |
-| `unlinked_at` | `TIMESTAMPTZ` | `NULL` = currently active |
+Links a Discord account to a `users` row. Supports unlinking — rows are soft-deleted via `unlinked_at` rather than removed, allowing re-linking later.
 
-**Unique indexes (partial, scoped to active rows where `unlinked_at IS NULL`):**
-- `one_active_discord_id` — a Discord account can only be linked to one user at a time.
-- `one_active_discord_per_user` — a user can only have one active Discord link at a time.
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `discord_id` | `BIGINT` | No | — | Discord snowflake |
+| `user_id` | `INT` | No | — | FK → `users(id)` |
+| `linked_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+| `unlinked_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = currently active |
 
-**Constraints:**
-- Unlinking a Discord identity from a user who has no `name` set is blocked by `enforce_discord_user_name` trigger.
+**Unique indexes (partial, WHERE `unlinked_at IS NULL`):**
+- `one_active_discord_id` on `(discord_id)` — a Discord account can only be linked to one user at a time
+- `one_active_discord_per_user` on `(user_id)` — a user can only have one active Discord link at a time
+
+**Triggers:**
+- `enforce_discord_user_name` — after any INSERT/UPDATE/DELETE, blocks unlinking Discord from a user who has no `name` set (would leave them unreachable)
 
 ---
 
 ### `user_credentials`
-Stores hashed passwords for webapp login. One row per user, optional.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_id` | `INT` | PK, FK → `users(id)` |
-| `password_hash` | `TEXT` | |
+Stores hashed passwords for webapp login. Optional — Discord-only users have no row here.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `user_id` | `INT` | No | — | PK, FK → `users(id)` |
+| `password_hash` | `TEXT` | No | — | |
 
 ---
 
 ### `user_aliases`
+
 Tracks the alias a user goes by when completing work (e.g. the name that appears in a release credit). Only one active alias per user at a time.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `user_id` | `INT` | FK → `users(id)` |
-| `alias` | `TEXT` | |
-| `created_at` | `TIMESTAMPTZ` | Default `now()` |
-| `retired_at` | `TIMESTAMPTZ` | `NULL` = currently active |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `user_id` | `INT` | No | — | FK → `users(id)` |
+| `alias` | `TEXT` | No | — | |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+| `retired_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = currently active |
 
-**Unique indexes (partial, scoped to active rows where `retired_at IS NULL`):**
-- `one_active_alias` — no two users can hold the same active alias.
-- `one_active_alias_per_user` — a user can only have one active alias at a time.
+**Unique indexes (partial, WHERE `retired_at IS NULL`):**
+- `one_active_alias` on `(alias)` — no two users can hold the same active alias
+- `one_active_alias_per_user` on `(user_id)` — a user can only have one active alias at a time
 
 ---
 
 ### `roles`
-Custom capability labels (e.g. TL, TS, CLRD, QC, PR, RP) — used to describe what a user can do, not to control what they are assigned to.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `name` | `TEXT` | Unique |
+Custom capability labels (e.g. TL, TS, CLRD, QC, PR, RP). Describes what a user can do. Case-insensitive — `PR` and `pr` are treated as the same value.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `name` | `CITEXT` | No | — | Unique |
+
+**Unique constraints:**
+- `roles_name_key` on `(name)`
 
 ---
 
 ### `user_roles`
-Which roles a user holds (their general capabilities, independent of any specific series or chapter).
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_id` | `INT` | FK → `users(id)` |
-| `role_id` | `INT` | FK → `roles(id)` |
+Which roles a user holds — their general capabilities, independent of any specific series or chapter.
 
-PK: `(user_id, role_id)`
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `user_id` | `INT` | No | — | FK → `users(id)` |
+| `role_id` | `INT` | No | — | FK → `roles(id)` |
+
+**PK:** `(user_id, role_id)`
 
 ---
 
 ### `series`
+
 A manga/manhwa/manhua title being worked on.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `name` | `TEXT` | Unique |
-| `status` | `TEXT` | `'active'` \| `'completed'` \| `'dropped'` \| `'hiatus'` |
-| `added_at` | `TIMESTAMPTZ` | Default `now()` |
-| `closed_at` | `TIMESTAMPTZ` | `NULL` = still ongoing |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `name` | `CITEXT` | No | — | Unique, case-insensitive |
+| `status` | `TEXT` | No | `'active'` | See check constraint below |
+| `added_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+| `closed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = still ongoing. Set when status becomes `completed`, `dropped`, or `hiatus`. |
+
+**Check constraints:**
+- `series_status_check`: `status IN ('active', 'completed', 'dropped', 'hiatus')`
+
+**Unique constraints:**
+- `series_name_key` on `(name)`
 
 ---
 
 ### `chapters`
+
 Individual chapters belonging to a series.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `series_id` | `INT` | FK → `series(id)` |
-| `name` | `TEXT` | e.g. `"Ch 51.1"` |
-| `status` | `TEXT` | `'in_progress'` \| `'released'` \| `'dropped'` \| `'hiatus'`. Default `'in_progress'`. |
-| `added_at` | `TIMESTAMPTZ` | Default `now()` |
-| `closed_at` | `TIMESTAMPTZ` | `NULL` = still in progress |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `series_id` | `INT` | No | — | FK → `series(id)` |
+| `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
+| `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
+| `status` | `TEXT` | No | `'in_progress'` | See check constraint below |
+| `added_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+| `closed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = still in progress |
 
-Unique on `(series_id, name)`.
+**Check constraints:**
+- `chapters_status_check`: `status IN ('in_progress', 'released', 'dropped', 'hiatus')`
+
+**Unique constraints:**
+- `chapters_series_id_name_key` on `(series_id, name)` — display names are unique within a series
+- `chapters_series_id_number_key` on `(series_id, number)` — chapter numbers are unique within a series
 
 ---
 
 ### `tasks`
-Custom task types that must be completed before a chapter can be released (e.g. Translation, Typesetting, QC).
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `SERIAL` | PK |
-| `name` | `TEXT` | Unique |
+Custom task types that must be completed before a chapter can be released (e.g. Translation, Typesetting, QC). Case-insensitive.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK |
+| `name` | `CITEXT` | No | — | Unique |
+
+**Unique constraints:**
+- `tasks_name_key` on `(name)`
 
 ---
 
 ### `task_dependencies`
+
 Defines which tasks must be completed before others can start.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `task_id` | `INT` | FK → `tasks(id)` |
-| `depends_on_task_id` | `INT` | FK → `tasks(id)` |
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `task_id` | `INT` | No | — | FK → `tasks(id)` — the task that has a prerequisite |
+| `depends_on_task_id` | `INT` | No | — | FK → `tasks(id)` — the task that must be done first |
 
-PK: `(task_id, depends_on_task_id)`
+**PK:** `(task_id, depends_on_task_id)`
+
+**Indexes:**
+- `idx_task_dependencies_depends_on_task_id` on `(depends_on_task_id)` — the PK only covers lookups by `task_id`; this index covers the reverse direction (`listDependentsOf`)
 
 ---
 
 ### `role_tasks`
-Maps which tasks a role is responsible for. Used to validate task assignments — when assigning a user to a series or chapter for a given task, the task must be mapped to one of the user's roles.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `role_id` | `INT` | FK → `roles(id)` |
-| `task_id` | `INT` | FK → `tasks(id)` |
+Maps which tasks a role is responsible for. Used to validate task assignments — when assigning a user to a series or chapter task, the task must be mapped to one of that user's roles.
 
-PK: `(role_id, task_id)`
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `role_id` | `INT` | No | — | FK → `roles(id)` |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` |
+
+**PK:** `(role_id, task_id)`
+
+**Indexes:**
+- `idx_role_tasks_task_id` on `(task_id)` — the PK only covers lookups by `role_id`; this index covers lookups by `task_id` (`listByTask`)
 
 ---
 
 ### `series_assignments`
-Which users are assigned to a series for a given task (the default crew for a series). Used to auto-populate `chapter_assignments` when a new chapter is created.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_id` | `INT` | FK → `users(id)` |
-| `series_id` | `INT` | FK → `series(id)` |
-| `task_id` | `INT` | FK → `tasks(id)` |
+Which users are assigned to a series for a given task — the default crew. Used to auto-populate `chapter_assignments` when a new chapter is created.
 
-PK: `(user_id, series_id, task_id)`
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `user_id` | `INT` | No | — | FK → `users(id)` |
+| `series_id` | `INT` | No | — | FK → `series(id)` |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` |
+
+**PK:** `(user_id, series_id, task_id)`
+
+**Indexes:**
+- `idx_series_assignments_series_id` on `(series_id)` — the PK only covers lookups by `user_id`; this index covers `listBySeries`
 
 ---
 
 ### `chapter_assignments`
-Which users are assigned to a specific chapter for a given task. The to-do list for a chapter is rows where `completed_at IS NULL`; completion history is where `completed_at IS NOT NULL`.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_id` | `INT` | FK → `users(id)` |
-| `chapter_id` | `INT` | FK → `chapters(id)` |
-| `task_id` | `INT` | FK → `tasks(id)` |
-| `completed_at` | `TIMESTAMPTZ` | `NULL` = not yet done |
+Which users are assigned to a specific chapter for a given task. Doubles as both the to-do list and the completion record.
 
-PK: `(user_id, chapter_id, task_id)`
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `user_id` | `INT` | No | — | FK → `users(id)` |
+| `chapter_id` | `INT` | No | — | FK → `chapters(id)` |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` |
+| `completed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = outstanding; non-null = done, value is the completion timestamp |
+
+**PK:** `(user_id, chapter_id, task_id)`
+
+**Indexes:**
+- `idx_chapter_assignments_chapter_id` on `(chapter_id)` — the PK only covers lookups by `user_id`; this index covers `listByChapter`
 
 ---
 
 ## Triggers
 
-| Trigger | Table | Event | Purpose |
-|---------|-------|-------|---------|
-| `enforce_supermanager_exists` | `users` | `INSERT`, `UPDATE`, `DELETE` | Ensures at least one active user with `permission_level = 2` always exists |
-| `enforce_user_name` | `users` | `INSERT`, `UPDATE` | A user with no active Discord identity must have a `name` |
-| `enforce_discord_user_name` | `discord_identities` | `INSERT`, `UPDATE`, `DELETE` | Blocks unlinking Discord from a user who has no `name` |
+All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the transaction, not immediately after each row change. This allows multi-step operations (e.g. inserting a user and their Discord identity in the same transaction) without intermediate constraint violations.
 
-All triggers are `DEFERRABLE INITIALLY DEFERRED`.
+| Trigger | Table | Events | Behaviour |
+|---------|-------|--------|-----------|
+| `enforce_supermanager_exists` | `users` | INSERT, UPDATE, DELETE | Raises if no active user (`left_at IS NULL`) has `permission_level = 2` |
+| `enforce_user_name` | `users` | INSERT, UPDATE | Raises if the user has no active `discord_identities` row and `name IS NULL` |
+| `enforce_discord_user_name` | `discord_identities` | INSERT, UPDATE, DELETE | Raises if the affected user would be left with no active Discord link and no `name` |
 
 ---
 
-## Key Design Notes
+## Extensions
 
-- **User identity:** A user exists in `users` and is reachable via either `name` (webapp) or an active `discord_identities` row (bot). Both can be active simultaneously.
-- **Aliases vs names:** `users.name` is the login/identity name; `user_aliases` is the public credit alias used in release history.
-- **Permissions:** `permission_level` is a single integer (`0`/`1`/`2`) replacing the old `is_manager`/`is_supermanager` boolean flags. Enforced via a `CHECK` constraint.
-- **Roles:** `roles` and `user_roles` describe a user's general capabilities. `role_tasks` maps roles to tasks and is used only for assignment validation.
-- **Assignments are task-scoped:** `series_assignments` and `chapter_assignments` link users to specific tasks, not roles. This eliminates ambiguity when validating work progress events — the check is a direct lookup on `(user, chapter, task)`.
-- **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion record. To-do list = `WHERE completed_at IS NULL`; completion history = `WHERE completed_at IS NOT NULL`.
-- **Soft deletes:** Users, aliases, and Discord identities are never hard-deleted — `left_at`, `retired_at`, and `unlinked_at` mark deactivation, preserving historical completion records.
+| Extension | Purpose |
+|-----------|---------|
+| `citext` | Case-insensitive text type — used for `roles.name`, `tasks.name`, `series.name`, `chapters.name` |
+
+---
+
+## Design Notes
+
+- **User identity:** A user is reachable via `users.name` (webapp login) or an active `discord_identities` row (bot), or both. At least one must always be present.
+- **Aliases vs names:** `users.name` is the login/identity name. `user_aliases.alias` is the public credit name that appears in release history — separate because users may want a different display name from their login.
+- **Permissions:** A single `permission_level` integer (`0`/`1`/`2`) replaces the old `is_manager`/`is_supermanager` boolean flags. At least one active supermanager (`2`) must always exist.
+- **Roles vs tasks:** `roles` describe what a user *can* do. `tasks` describe the steps a chapter requires. `role_tasks` connects them for assignment validation. Assignments themselves (`series_assignments`, `chapter_assignments`) are task-scoped — not role-scoped — to avoid ambiguity.
+- **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion timestamp in one column. To-do list = `WHERE completed_at IS NULL`; history = `WHERE completed_at IS NOT NULL`.
+- **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved.
+- **Case insensitivity:** `citext` columns compare and enforce uniqueness case-insensitively but store values exactly as inserted. `PR` and `pr` cannot coexist; a lookup for either finds the same row.

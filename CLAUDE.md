@@ -115,6 +115,9 @@ psql "$DATABASE_URL" -f db/migrations/011_replace_manager_flags_with_permission_
 psql "$DATABASE_URL" -f db/migrations/012_add_closed_at_to_chapters.sql
 psql "$DATABASE_URL" -f db/migrations/013_simplify_chapter_task_tracking.sql
 psql "$DATABASE_URL" -f db/migrations/014_add_hiatus_to_chapter_status.sql
+psql "$DATABASE_URL" -f db/migrations/015_add_missing_indexes.sql
+psql "$DATABASE_URL" -f db/migrations/016_citext_name_columns.sql
+psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
 ```
 
 ### Key Schema Notes

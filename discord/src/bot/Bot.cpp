@@ -22,7 +22,13 @@
 #include "bot/eventHandlers/triggers/WorkProgress.hpp"
 
 // Commands
+#include "bot/eventHandlers/commands/AddRole.hpp"
+#include "bot/eventHandlers/commands/AddSeries.hpp"
+#include "bot/eventHandlers/commands/AddTask.hpp"
+#include "bot/eventHandlers/commands/AssignRole.hpp"
+#include "bot/eventHandlers/commands/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/RemoveRole.hpp"
 #include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
@@ -56,6 +62,45 @@ void Bot::fillCommandMap() {
       "Set the alias that you want to use for credit",
       [this](const dpp::slashcommand_t &e) { Commands::setAlias(*this, e); },
       {dpp::command_option(dpp::co_string, "alias", "The Credit Name you want to use", true)}};
+
+  m_commands["add-role"] = {
+      "Create a new scanlation role",
+      [this](const dpp::slashcommand_t &e) { Commands::addRole(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the role", true)}};
+
+  m_commands["add-task"] = {
+      "Create a new task type",
+      [this](const dpp::slashcommand_t &e) { Commands::addTask(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the task", true)}};
+
+  m_commands["add-series"] = {
+      "Add a new series",
+      [this](const dpp::slashcommand_t &e) { Commands::addSeries(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the series", true)}};
+
+  m_commands["assign-role"] = {
+      "Assign a role to a user",
+      [this](const dpp::slashcommand_t &e) { Commands::assignRole(*this, e); },
+      {
+          dpp::command_option(dpp::co_user, "user", "The user to assign the role to", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+      }};
+
+  m_commands["remove-role"] = {
+      "Remove a role from a user",
+      [this](const dpp::slashcommand_t &e) { Commands::removeRole(*this, e); },
+      {
+          dpp::command_option(dpp::co_user, "user", "The user to remove the role from", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+      }};
+
+  m_commands["map-role-task"] = {
+      "Map a role to a task it is responsible for",
+      [this](const dpp::slashcommand_t &e) { Commands::mapRoleTask(*this, e); },
+      {
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+          dpp::command_option(dpp::co_string, "task", "Name of the task", true),
+      }};
 }
 
 void Bot::fillTriggerList() {
@@ -87,7 +132,7 @@ Bot::Bot(ConfigManager &cfg)
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
       m_config(cfg),
-      m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<int>("db_pool_size")) {
+      m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<size_t>("db_pool_size")) {
 
   m_core.on_log(dpp::utility::cout_logger());
 

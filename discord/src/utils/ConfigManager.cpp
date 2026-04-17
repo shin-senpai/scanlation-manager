@@ -24,15 +24,16 @@ void ConfigManager::save() {
 void ConfigManager::load() {
   std::lock_guard<std::mutex> lock(m_mtx);
   std::ifstream f(m_path);
-  if(f.is_open() && f.peek() != std::ifstream::traits_type::eof()) {
-    try {
-      f >> m_data;
-    } catch(const nlohmann::json::exception &e) {
-      m_data = nlohmann::json::object();
-    }
-  } else {
-    m_data = nlohmann::json::object();
+
+  if (!f.is_open()) {
+    throw std::runtime_error("Failed to open config file: " + m_path);
   }
+
+  if (f.peek() == std::ifstream::traits_type::eof()) {
+    throw std::runtime_error("Config file is empty: " + m_path);
+  }
+
+  f >> m_data;
 }
 
 void ConfigManager::set(const std::string_view &key, const nlohmann::json &value) {

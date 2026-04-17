@@ -136,7 +136,8 @@ Individual chapters belonging to a series.
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
 | `series_id` | `INT` | No | — | FK → `series(id)` |
-| `name` | `CITEXT` | No | — | e.g. `"Ch 51.1"`, case-insensitive |
+| `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
+| `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
 | `status` | `TEXT` | No | `'in_progress'` | See check constraint below |
 | `added_at` | `TIMESTAMPTZ` | No | `NOW()` | |
 | `closed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = still in progress |
@@ -145,7 +146,8 @@ Individual chapters belonging to a series.
 - `chapters_status_check`: `status IN ('in_progress', 'released', 'dropped', 'hiatus')`
 
 **Unique constraints:**
-- `chapters_series_id_name_key` on `(series_id, name)` — chapter names are unique within a series, not globally
+- `chapters_series_id_name_key` on `(series_id, name)` — display names are unique within a series
+- `chapters_series_id_number_key` on `(series_id, number)` — chapter numbers are unique within a series
 
 ---
 

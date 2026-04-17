@@ -23,9 +23,12 @@
 
 // Commands
 #include "bot/eventHandlers/commands/AddRole.hpp"
+#include "bot/eventHandlers/commands/AddSeries.hpp"
 #include "bot/eventHandlers/commands/AddTask.hpp"
+#include "bot/eventHandlers/commands/AssignRole.hpp"
 #include "bot/eventHandlers/commands/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/RemoveRole.hpp"
 #include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
@@ -69,6 +72,27 @@ void Bot::fillCommandMap() {
       "Create a new task type",
       [this](const dpp::slashcommand_t &e) { Commands::addTask(*this, e); },
       {dpp::command_option(dpp::co_string, "name", "Name of the task", true)}};
+
+  m_commands["add-series"] = {
+      "Add a new series",
+      [this](const dpp::slashcommand_t &e) { Commands::addSeries(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the series", true)}};
+
+  m_commands["assign-role"] = {
+      "Assign a role to a user",
+      [this](const dpp::slashcommand_t &e) { Commands::assignRole(*this, e); },
+      {
+          dpp::command_option(dpp::co_user, "user", "The user to assign the role to", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+      }};
+
+  m_commands["remove-role"] = {
+      "Remove a role from a user",
+      [this](const dpp::slashcommand_t &e) { Commands::removeRole(*this, e); },
+      {
+          dpp::command_option(dpp::co_user, "user", "The user to remove the role from", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+      }};
 
   m_commands["map-role-task"] = {
       "Map a role to a task it is responsible for",

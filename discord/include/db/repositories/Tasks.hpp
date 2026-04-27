@@ -15,9 +15,16 @@ class TasksRepository {
 public:
   int create(pqxx::transaction_base &txn, std::string_view name);
 
+  void remove(pqxx::transaction_base &txn, int id);
+
+  void retire(pqxx::transaction_base &txn, int id);
+
+  void unretire(pqxx::transaction_base &txn, int id);
+
   std::optional<Task> findById(pqxx::transaction_base &txn, int id);
 
   std::optional<Task> findByName(pqxx::transaction_base &txn, std::string_view name);
 
-  std::vector<Task> listAll(pqxx::transaction_base &txn);
+  // By default excludes retired tasks.
+  std::vector<Task> listAll(pqxx::transaction_base &txn, bool include_retired = false);
 };

@@ -26,9 +26,16 @@
 #include "bot/eventHandlers/commands/AddSeries.hpp"
 #include "bot/eventHandlers/commands/AddTask.hpp"
 #include "bot/eventHandlers/commands/AssignRole.hpp"
+#include "bot/eventHandlers/commands/DeleteRole.hpp"
+#include "bot/eventHandlers/commands/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/ListRoles.hpp"
+#include "bot/eventHandlers/commands/ListTasks.hpp"
 #include "bot/eventHandlers/commands/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/Ping.hpp"
 #include "bot/eventHandlers/commands/RemoveRole.hpp"
+#include "bot/eventHandlers/commands/RemoveRoleTask.hpp"
+#include "bot/eventHandlers/commands/RetireTask.hpp"
+#include "bot/eventHandlers/commands/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
@@ -92,6 +99,42 @@ void Bot::fillCommandMap() {
       {
           dpp::command_option(dpp::co_user, "user", "The user to remove the role from", true),
           dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+      }};
+
+  m_commands["delete-role"] = {
+      "Delete a role and all its mappings",
+      [this](const dpp::slashcommand_t &e) { Commands::deleteRole(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the role to delete", true)}};
+
+  m_commands["delete-task"] = {
+      "Delete a task and all its mappings",
+      [this](const dpp::slashcommand_t &e) { Commands::deleteTask(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to delete", true)}};
+
+  m_commands["retire-task"] = {
+      "Retire a task, preserving its completion history",
+      [this](const dpp::slashcommand_t &e) { Commands::retireTask(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to retire", true)}};
+
+  m_commands["unretire-task"] = {
+      "Restore a retired task to active status",
+      [this](const dpp::slashcommand_t &e) { Commands::unretireTask(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to unretire", true)}};
+
+  m_commands["list-roles"] = {
+      "List all roles",
+      [this](const dpp::slashcommand_t &e) { Commands::listRoles(*this, e); }};
+
+  m_commands["list-tasks"] = {
+      "List all tasks",
+      [this](const dpp::slashcommand_t &e) { Commands::listTasks(*this, e); }};
+
+  m_commands["remove-role-task"] = {
+      "Remove a role-task mapping",
+      [this](const dpp::slashcommand_t &e) { Commands::removeRoleTask(*this, e); },
+      {
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+          dpp::command_option(dpp::co_string, "task", "Name of the task", true),
       }};
 
   m_commands["map-role-task"] = {

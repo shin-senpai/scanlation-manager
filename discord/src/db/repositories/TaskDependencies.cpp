@@ -13,6 +13,12 @@ void TaskDependenciesRepository::remove(pqxx::transaction_base &txn, int task_id
       pqxx::params(txn, task_id, depends_on_task_id));
 }
 
+void TaskDependenciesRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
+  txn.exec(
+      "DELETE FROM task_dependencies WHERE task_id = $1 OR depends_on_task_id = $1",
+      pqxx::params(txn, task_id));
+}
+
 std::vector<TaskDependency> TaskDependenciesRepository::listDependenciesOf(pqxx::transaction_base &txn, int task_id) {
   auto results = txn.exec(
       "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id = $1",

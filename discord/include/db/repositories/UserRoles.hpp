@@ -15,5 +15,7 @@ public:
 
   void remove(pqxx::transaction_base &txn, int user_id, int role_id);
 
+  void removeAllByRole(pqxx::transaction_base &txn, int role_id);
+
   std::vector<UserRole> listByUser(pqxx::transaction_base &txn, int user_id);
 };

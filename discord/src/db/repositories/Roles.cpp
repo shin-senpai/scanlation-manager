@@ -9,6 +9,12 @@ int RolesRepository::create(pqxx::transaction_base &txn, std::string_view name) 
   return result[0]["id"].as<int>();
 }
 
+void RolesRepository::remove(pqxx::transaction_base &txn, int id) {
+  txn.exec(
+      "DELETE FROM roles WHERE id = $1",
+      pqxx::params(txn, id));
+}
+
 std::optional<Role> RolesRepository::findById(pqxx::transaction_base &txn, int id) {
   auto result = txn.exec(
       "SELECT id, name FROM roles WHERE id = $1",
@@ -34,7 +40,7 @@ std::optional<Role> RolesRepository::findByName(pqxx::transaction_base &txn, std
 }
 
 std::vector<Role> RolesRepository::listAll(pqxx::transaction_base &txn) {
-  auto results = txn.exec("SELECT id, name FROM roles");
+  auto results = txn.exec("SELECT id, name FROM roles ORDER BY name");
 
   std::vector<Role> roles;
   roles.reserve(results.size());

@@ -15,6 +15,8 @@ class RolesRepository {
 public:
   int create(pqxx::transaction_base &txn, std::string_view name);
 
+  void remove(pqxx::transaction_base &txn, int id);
+
   std::optional<Role> findById(pqxx::transaction_base &txn, int id);
 
   std::optional<Role> findByName(pqxx::transaction_base &txn, std::string_view name);

@@ -13,6 +13,12 @@ void SeriesAssignmentsRepository::remove(pqxx::transaction_base &txn, int user_i
       pqxx::params(txn, user_id, series_id, task_id));
 }
 
+void SeriesAssignmentsRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
+  txn.exec(
+      "DELETE FROM series_assignments WHERE task_id = $1",
+      pqxx::params(txn, task_id));
+}
+
 std::vector<SeriesAssignment> SeriesAssignmentsRepository::listBySeries(pqxx::transaction_base &txn, int series_id, std::optional<int> task_id) {
   std::string query = "SELECT user_id, series_id, task_id FROM series_assignments WHERE series_id = $1";
   pqxx::result results;

@@ -26,6 +26,26 @@ void ChapterAssignmentsRepository::remove(pqxx::transaction_base &txn, int user_
       pqxx::params(txn, user_id, chapter_id, task_id));
 }
 
+void ChapterAssignmentsRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
+  txn.exec(
+      "DELETE FROM chapter_assignments WHERE task_id = $1",
+      pqxx::params(txn, task_id));
+}
+
+void ChapterAssignmentsRepository::removeOutstandingByTask(pqxx::transaction_base &txn, int task_id) {
+  txn.exec(
+      "DELETE FROM chapter_assignments WHERE task_id = $1 AND completed_at IS NULL",
+      pqxx::params(txn, task_id));
+}
+
+bool ChapterAssignmentsRepository::hasCompletedByTask(pqxx::transaction_base &txn, int task_id) {
+  auto result = txn.exec(
+      "SELECT 1 FROM chapter_assignments WHERE task_id = $1 AND completed_at IS NOT NULL LIMIT 1",
+      pqxx::params(txn, task_id));
+
+  return !result.empty();
+}
+
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx::transaction_base &txn, int chapter_id, std::optional<int> task_id, std::optional<bool> completed) {
   std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE chapter_id = $1";
   if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";

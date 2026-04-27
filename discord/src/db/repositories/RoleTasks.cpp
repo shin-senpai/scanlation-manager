@@ -13,6 +13,18 @@ void RoleTasksRepository::remove(pqxx::transaction_base &txn, int role_id, int t
       pqxx::params(txn, role_id, task_id));
 }
 
+void RoleTasksRepository::removeAllByRole(pqxx::transaction_base &txn, int role_id) {
+  txn.exec(
+      "DELETE FROM role_tasks WHERE role_id = $1",
+      pqxx::params(txn, role_id));
+}
+
+void RoleTasksRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
+  txn.exec(
+      "DELETE FROM role_tasks WHERE task_id = $1",
+      pqxx::params(txn, task_id));
+}
+
 std::vector<RoleTask> RoleTasksRepository::listByRole(pqxx::transaction_base &txn, int role_id) {
   auto results = txn.exec(
       "SELECT role_id, task_id FROM role_tasks WHERE role_id = $1",

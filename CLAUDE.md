@@ -118,6 +118,7 @@ psql "$DATABASE_URL" -f db/migrations/014_add_hiatus_to_chapter_status.sql
 psql "$DATABASE_URL" -f db/migrations/015_add_missing_indexes.sql
 psql "$DATABASE_URL" -f db/migrations/016_citext_name_columns.sql
 psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
+psql "$DATABASE_URL" -f db/migrations/018_cascade_deletes_and_task_retirement.sql
 ```
 
 ### Key Schema Notes
@@ -125,6 +126,8 @@ psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
 - Every user must have either a `name` (webapp) or a row in `discord_identities` — enforced by a constraint trigger
 - At least one supermanager must always exist — enforced by a constraint trigger
 - `chapter_assignments.completed_at` is both the "done" flag and the completion record — `NULL` means outstanding, non-null means done
+- Tasks can be hard-deleted only if they have no completed `chapter_assignments`; otherwise they must be retired (`tasks.retired_at`)
+- Deleting a role or task cascades to related junction tables at the DB level (`ON DELETE CASCADE`); `chapter_assignments` is excluded from cascade to preserve history
 
 ---
 

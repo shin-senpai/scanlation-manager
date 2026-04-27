@@ -15,6 +15,8 @@ public:
 
   void remove(pqxx::transaction_base &txn, int task_id, int depends_on_task_id);
 
+  void removeAllByTask(pqxx::transaction_base &txn, int task_id);
+
   // Returns the tasks that task_id depends on.
   std::vector<TaskDependency> listDependenciesOf(pqxx::transaction_base &txn, int task_id);
 

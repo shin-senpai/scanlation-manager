@@ -248,6 +248,8 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 | `enforce_user_name` | `users` | INSERT, UPDATE | Raises if the user has no active `discord_identities` row and `name IS NULL` |
 | `enforce_discord_user_name` | `discord_identities` | INSERT, UPDATE, DELETE | Raises if the affected user would be left with no active Discord link and no `name` |
 | `enforce_completed_assignment_immutable` | `chapter_assignments` | DELETE | Raises if the row being deleted has `completed_at IS NOT NULL` — completed records are permanent |
+| `roles_normalize_name` | `roles` | INSERT, UPDATE | Sets `NEW.name = UPPER(NEW.name)` before write — role names are always stored uppercase |
+| `tasks_normalize_name` | `tasks` | INSERT, UPDATE | Sets `NEW.name = UPPER(NEW.name)` before write — task names are always stored uppercase |
 
 ---
 
@@ -269,3 +271,4 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 - **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved. Tasks follow a hybrid approach: hard-deleted if they have no completion history, soft-deleted (`retired_at`) otherwise to preserve the record.
 - **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, and `task_dependencies`. `chapter_assignments` is intentionally excluded from cascade — it is historical data and must be managed explicitly (retire the task instead of deleting it).
 - **Case insensitivity:** `citext` columns compare and enforce uniqueness case-insensitively but store values exactly as inserted. `PR` and `pr` cannot coexist; a lookup for either finds the same row.
+- **Name normalization:** `roles.name` and `tasks.name` are additionally normalized to uppercase on write via a `BEFORE INSERT OR UPDATE` trigger. Any casing passed in (`pR`, `pr`, `PR`) is stored and returned as `PR`. `series.name` and `chapters.name` are excluded — those are display names where casing is meaningful.

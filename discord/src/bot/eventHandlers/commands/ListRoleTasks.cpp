@@ -30,6 +30,11 @@ void Commands::listRoleTasks(Bot &bot, const dpp::slashcommand_t &event) {
     const auto tasks = task_repo.listAll(session.rtx());
     const auto role_task_maps = role_task_repo.listAll(session.rtx());
 
+    if(role_task_maps.empty()) {
+      event.edit_original_response(dpp::message("No Mappings between Roles and Tasks exist"));
+      return;
+    }
+
     std::unordered_map<int, std::string> role_name_by_id;
     std::unordered_map<int, std::string> task_name_by_id;
     for(const auto &r : roles) {
@@ -45,13 +50,7 @@ void Commands::listRoleTasks(Bot &bot, const dpp::slashcommand_t &event) {
       int task_id = rtm.task_id;
 
       auto task_it = task_name_by_id.find(task_id);
-      if(task_it == task_name_by_id.end()) {
-        continue;
-      }
       auto role_it = role_name_by_id.find(role_id);
-      if(role_it == role_name_by_id.end()) {
-        continue;
-      }
 
       role_to_tasks[role_it->second].push_back(task_it->second);
     }

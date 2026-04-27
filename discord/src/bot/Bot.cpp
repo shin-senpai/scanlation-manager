@@ -28,17 +28,18 @@
 #include "bot/eventHandlers/commands/AssignRole.hpp"
 #include "bot/eventHandlers/commands/DeleteRole.hpp"
 #include "bot/eventHandlers/commands/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/ListRoleTasks.hpp"
 #include "bot/eventHandlers/commands/ListRoles.hpp"
 #include "bot/eventHandlers/commands/ListTasks.hpp"
 #include "bot/eventHandlers/commands/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/RemoveRole.hpp"
 #include "bot/eventHandlers/commands/RemoveRoleTask.hpp"
 #include "bot/eventHandlers/commands/RetireTask.hpp"
-#include "bot/eventHandlers/commands/UnretireTask.hpp"
-#include "bot/eventHandlers/commands/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/WorkProgress.hpp"
 
 void Bot::fillCommandMap() {
@@ -144,6 +145,10 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_string, "role", "Name of the role", true),
           dpp::command_option(dpp::co_string, "task", "Name of the task", true),
       }};
+
+  m_commands["list-role-tasks"] = {
+      "List all Role to Task mappings",
+      [this](const dpp::slashcommand_t &e) { Commands::listRoleTasks(*this, e); }};
 }
 
 void Bot::fillTriggerList() {

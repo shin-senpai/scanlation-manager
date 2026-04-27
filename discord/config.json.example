@@ -5,5 +5,6 @@
     "db_connection_string": "postgresql://scanlation_manager:scanlation@localhost:5432/scanlation_manager",
     "db_pool_size": 10,
     "guild_id": GUILD_ID,
-    "work_progress_channel": ""
+    "work_progress_channel": "",
+    "staff_role_id": 0
 }

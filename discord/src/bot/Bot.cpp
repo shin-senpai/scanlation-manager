@@ -6,6 +6,7 @@
 #include "utils/ConfigManager.hpp"
 
 // Standard Includes
+#include <algorithm>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -39,6 +40,7 @@
 #include "bot/eventHandlers/commands/RetireTask.hpp"
 #include "bot/eventHandlers/commands/SetAlias.hpp"
 #include "bot/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/WorkProgress.hpp"
 
@@ -51,6 +53,11 @@ void Bot::fillCommandMap() {
       "Sets the channel where progress should be posted",
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
       {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
+
+    m_commands["set-staff-role"] = {
+      "Sets the staff role",
+      [this](const dpp::slashcommand_t &e) { Commands::setStaffRole(*this, e); },
+      {dpp::command_option(dpp::co_role, "role", "Staff Roles", true)}};
 
   m_commands["work-update"] = {
       "Update your progress on a Chapter",
@@ -158,9 +165,38 @@ void Bot::fillTriggerList() {
       [this](const dpp::message_create_t &e) { Triggers::workProgress(e); });
 }
 
+static bool hasRole(const std::vector<dpp::snowflake> &roles, dpp::snowflake role_id) {
+  return std::find(roles.begin(), roles.end(), role_id) != roles.end();
+}
+
+static bool isAdmin(const dpp::snowflake guild_id, const dpp::snowflake user_id, const std::vector<dpp::snowflake> &roles) {
+  dpp::guild *guild = dpp::find_guild(guild_id);
+  if(!guild)
+    return false;
+
+  if(user_id == guild->owner_id)
+    return true;
+
+  for(const auto &role_id : roles) {
+    dpp::role *role = dpp::find_role(role_id);
+    if(!role){
+      continue;
+    }
+    if(role->has_manage_guild() || role->has_administrator()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void Bot::setWorkProgressChannel(dpp::snowflake channel_id) {
   m_config.set("work_progress_channel", static_cast<uint64_t>(channel_id));
   m_work_progress_channel = channel_id;
+}
+
+void Bot::setStaffRole(dpp::snowflake role_id) {
+  m_config.set("staff_role_id", static_cast<uint64_t>(role_id));
+  m_staff_role_id = role_id;
 }
 
 dpp::cluster &Bot::getCore() {
@@ -178,6 +214,7 @@ ConnectionPool &Bot::getPool() {
 Bot::Bot(ConfigManager &cfg)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
+      m_staff_role_id(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("staff_role_id"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
       m_config(cfg),
       m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<size_t>("db_pool_size")) {
@@ -206,6 +243,11 @@ Bot::Bot(ConfigManager &cfg)
   });
 
   m_core.on_slashcommand([this](const dpp::slashcommand_t &event) {
+    const auto &roles = event.command.member.get_roles();
+    if(!hasRole(roles, m_staff_role_id) && !isAdmin(event.command.guild_id, event.command.member.user_id, roles)) {
+      event.reply(dpp::message("You are not allowed to use this bot").set_flags(dpp::m_ephemeral));
+      return;
+    }
     auto it = this->m_commands.find(event.command.get_command_name());
     if(it != this->m_commands.end()) {
       it->second.handler(event);

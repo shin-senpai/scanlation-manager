@@ -18,6 +18,7 @@ class Bot {
 private:
   dpp::cluster m_core;
   dpp::snowflake m_work_progress_channel;
+  dpp::snowflake m_staff_role_id;
   const dpp::snowflake m_guild_id;
   ConfigManager &m_config;
   ConnectionPool m_pool;
@@ -49,6 +50,7 @@ public:
   ConnectionPool &getPool();
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
+  void setStaffRole(dpp::snowflake role_id);
 
   void start();
 };

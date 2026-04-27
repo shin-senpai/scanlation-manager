@@ -12,7 +12,6 @@
 #include "types/Permission.hpp"
 
 // Standard Includes
-#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -59,10 +58,7 @@ void Commands::removeRoleTask(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    const auto mappings = role_tasks_repo.listByRole(session.wtx(), maybe_role->id);
-    const bool mapped = std::any_of(mappings.begin(), mappings.end(),
-        [&](const RoleTask &rt) { return rt.task_id == maybe_task->id; });
-    if(!mapped) {
+    if(!role_tasks_repo.exists(session.wtx(), maybe_role->id, maybe_task->id)) {
       event.edit_original_response(dpp::message("Role **" + role_name + "** is not mapped to task **" + task_name + "**."));
       return;
     }

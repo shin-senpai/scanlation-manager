@@ -1,6 +1,7 @@
 #pragma once
 
 // User Defined Includes
+#include "db/repositories/Series.hpp"
 #include "models/ModelRoleTask.hpp"
 
 // Standard Includes
@@ -15,11 +16,15 @@ public:
 
   void remove(pqxx::transaction_base &txn, int role_id, int task_id);
 
+  bool exists(pqxx::transaction_base &txn, int role_id, int task_id);
+
   void removeAllByRole(pqxx::transaction_base &txn, int role_id);
 
   void removeAllByTask(pqxx::transaction_base &txn, int task_id);
 
-  std::vector<RoleTask> listByRole(pqxx::transaction_base &txn, int role_id);
+  std::vector<int> listTaskIdsByRole(pqxx::transaction_base &txn, int role_id);
 
-  std::vector<RoleTask> listByTask(pqxx::transaction_base &txn, int task_id);
+  std::vector<int> listRoleIdsByTask(pqxx::transaction_base &txn, int task_id);
+
+  std::vector<RoleTask> listAll(pqxx::transaction_base &txn);
 };

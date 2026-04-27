@@ -26,12 +26,6 @@ void ChapterAssignmentsRepository::remove(pqxx::transaction_base &txn, int user_
       pqxx::params(txn, user_id, chapter_id, task_id));
 }
 
-void ChapterAssignmentsRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
-  txn.exec(
-      "DELETE FROM chapter_assignments WHERE task_id = $1",
-      pqxx::params(txn, task_id));
-}
-
 void ChapterAssignmentsRepository::removeOutstandingByTask(pqxx::transaction_base &txn, int task_id) {
   txn.exec(
       "DELETE FROM chapter_assignments WHERE task_id = $1 AND completed_at IS NULL",

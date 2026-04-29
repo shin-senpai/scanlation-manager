@@ -6,5 +6,5 @@
 class Bot;
 
 namespace Commands {
-  void retireTask(Bot &bot, const dpp::slashcommand_t &event);
+void retireTask(Bot &bot, const dpp::slashcommand_t &event);
 }

@@ -6,5 +6,5 @@
 class Bot;
 
 namespace Commands {
-  void assignRole(Bot &bot, const dpp::slashcommand_t &event);
+void assignRole(Bot &bot, const dpp::slashcommand_t &event);
 }

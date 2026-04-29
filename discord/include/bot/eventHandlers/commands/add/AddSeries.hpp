@@ -6,5 +6,5 @@
 class Bot;
 
 namespace Commands {
-  void addSeries(Bot &bot, const dpp::slashcommand_t &event);
+void addSeries(Bot &bot, const dpp::slashcommand_t &event);
 }

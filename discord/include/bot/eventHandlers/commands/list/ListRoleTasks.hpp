@@ -6,5 +6,5 @@
 class Bot;
 
 namespace Commands {
-  void listRoleTasks(Bot &bot, const dpp::slashcommand_t &event);
+void listRoleTasks(Bot &bot, const dpp::slashcommand_t &event);
 }

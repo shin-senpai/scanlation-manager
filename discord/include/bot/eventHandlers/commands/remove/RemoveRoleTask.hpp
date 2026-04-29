@@ -6,5 +6,5 @@
 class Bot;
 
 namespace Commands {
-  void removeRoleTask(Bot &bot, const dpp::slashcommand_t &event);
+void removeRoleTask(Bot &bot, const dpp::slashcommand_t &event);
 }

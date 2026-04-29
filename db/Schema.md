@@ -136,6 +136,7 @@ Individual chapters belonging to a series.
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
 | `series_id` | `INT` | No | — | FK → `series(id)` |
+| `volume` | `INT` | Yes | — | Volume number, if the series uses a volume structure. `NULL` = not part of a named volume (e.g. web release). Not unique — multiple chapters share the same volume. |
 | `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
 | `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
 | `status` | `TEXT` | No | `'in_progress'` | See check constraint below |

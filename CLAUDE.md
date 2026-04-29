@@ -125,6 +125,7 @@ psql "$DATABASE_URL" -f db/migrations/016_citext_name_columns.sql
 psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
 psql "$DATABASE_URL" -f db/migrations/018_cascade_deletes_and_task_retirement.sql
 psql "$DATABASE_URL" -f db/migrations/019_uppercase_role_task_names.sql
+psql "$DATABASE_URL" -f db/migrations/020_add_volume_to_chapters.sql
 ```
 
 ### Key Schema Notes

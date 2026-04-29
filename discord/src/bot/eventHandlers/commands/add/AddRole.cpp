@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/DeleteRole.hpp"
+#include "bot/eventHandlers/commands/add/AddRole.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"
@@ -17,7 +17,7 @@
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
 
-void Commands::deleteRole(Bot &bot, const dpp::slashcommand_t &event) {
+void Commands::addRole(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
@@ -41,18 +41,14 @@ void Commands::deleteRole(Bot &bot, const dpp::slashcommand_t &event) {
 
     const std::string name = std::get<std::string>(event.get_parameter("name"));
 
-    const auto maybe_role = roles_repo.findByName(session.wtx(), name);
-    if(!maybe_role) {
-      event.edit_original_response(dpp::message("Role **" + name + "** does not exist."));
-      return;
-    }
-
-    roles_repo.remove(session.wtx(), maybe_role->id);
+    const int role_id = roles_repo.create(session.wtx(), name);
     session.commit();
 
-    event.edit_original_response(dpp::message("Role **" + name + "** deleted."));
+    event.edit_original_response(dpp::message("Role **" + name + "** created with ID `" + std::to_string(role_id) + "`."));
+  } catch(const pqxx::unique_violation &) {
+    event.edit_original_response(dpp::message("A role with that name already exists."));
   } catch(const std::exception &e) {
-    std::cerr << "deleteRole failed for user (" << discord_id << "): " << e.what() << std::endl;
-    event.edit_original_response(dpp::message("Failed to delete role. Contact the administrator to resolve this issue."));
+    std::cerr << "addRole failed for user (" << discord_id << "): " << e.what() << std::endl;
+    event.edit_original_response(dpp::message("Failed to create role. Contact the administrator to resolve this issue."));
   }
 }

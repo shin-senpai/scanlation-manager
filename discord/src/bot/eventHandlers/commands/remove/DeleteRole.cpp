@@ -1,11 +1,11 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/RetireTask.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
-#include "db/repositories/Tasks.hpp"
+#include "db/repositories/Roles.hpp"
 #include "db/repositories/User.hpp"
 #include "types/Permission.hpp"
 
@@ -17,7 +17,7 @@
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
 
-void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
+void Commands::deleteRole(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
@@ -25,7 +25,7 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
     DbSession session(bot.getPool());
     DiscordIdentityRepository identity_repo;
     UserRepository user_repo;
-    TasksRepository tasks_repo;
+    RolesRepository roles_repo;
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
@@ -41,23 +41,18 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
 
     const std::string name = std::get<std::string>(event.get_parameter("name"));
 
-    const auto maybe_task = tasks_repo.findByName(session.wtx(), name);
-    if(!maybe_task) {
-      event.edit_original_response(dpp::message("Task **" + name + "** does not exist."));
+    const auto maybe_role = roles_repo.findByName(session.wtx(), name);
+    if(!maybe_role) {
+      event.edit_original_response(dpp::message("Role **" + name + "** does not exist."));
       return;
     }
 
-    if(maybe_task->retired_at) {
-      event.edit_original_response(dpp::message("Task **" + name + "** is already retired."));
-      return;
-    }
-
-    tasks_repo.retire(session.wtx(), maybe_task->id);
+    roles_repo.remove(session.wtx(), maybe_role->id);
     session.commit();
 
-    event.edit_original_response(dpp::message("Task **" + name + "** retired. Completion history is preserved."));
+    event.edit_original_response(dpp::message("Role **" + name + "** deleted."));
   } catch(const std::exception &e) {
-    std::cerr << "retireTask failed for user (" << discord_id << "): " << e.what() << std::endl;
-    event.edit_original_response(dpp::message("Failed to retire task. Contact the administrator to resolve this issue."));
+    std::cerr << "deleteRole failed for user (" << discord_id << "): " << e.what() << std::endl;
+    event.edit_original_response(dpp::message("Failed to delete role. Contact the administrator to resolve this issue."));
   }
 }

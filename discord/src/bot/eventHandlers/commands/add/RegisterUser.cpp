@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/RegisterUser.hpp"
+#include "bot/eventHandlers/commands/add/RegisterUser.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"

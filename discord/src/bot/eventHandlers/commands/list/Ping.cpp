@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/Ping.hpp"
+#include "bot/eventHandlers/commands/list/Ping.hpp"
 
 // User Defined Includes
 

@@ -1,11 +1,11 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/AddSeries.hpp"
+#include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
-#include "db/repositories/Series.hpp"
+#include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
 #include "types/Permission.hpp"
 
@@ -17,7 +17,7 @@
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
 
-void Commands::addSeries(Bot &bot, const dpp::slashcommand_t &event) {
+void Commands::unretireTask(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
@@ -25,7 +25,7 @@ void Commands::addSeries(Bot &bot, const dpp::slashcommand_t &event) {
     DbSession session(bot.getPool());
     DiscordIdentityRepository identity_repo;
     UserRepository user_repo;
-    SeriesRepository series_repo;
+    TasksRepository tasks_repo;
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
@@ -41,14 +41,23 @@ void Commands::addSeries(Bot &bot, const dpp::slashcommand_t &event) {
 
     const std::string name = std::get<std::string>(event.get_parameter("name"));
 
-    const int series_id = series_repo.create(session.wtx(), name);
+    const auto maybe_task = tasks_repo.findByName(session.wtx(), name);
+    if(!maybe_task) {
+      event.edit_original_response(dpp::message("Task **" + name + "** does not exist."));
+      return;
+    }
+
+    if(!maybe_task->retired_at) {
+      event.edit_original_response(dpp::message("Task **" + name + "** is not retired."));
+      return;
+    }
+
+    tasks_repo.unretire(session.wtx(), maybe_task->id);
     session.commit();
 
-    event.edit_original_response(dpp::message("Series **" + name + "** created with ID `" + std::to_string(series_id) + "`."));
-  } catch(const pqxx::unique_violation &) {
-    event.edit_original_response(dpp::message("A series with that name already exists."));
+    event.edit_original_response(dpp::message("Task **" + name + "** is active again."));
   } catch(const std::exception &e) {
-    std::cerr << "addSeries failed for user (" << discord_id << "): " << e.what() << std::endl;
-    event.edit_original_response(dpp::message("Failed to create series. Contact the administrator to resolve this issue."));
+    std::cerr << "unretireTask failed for user (" << discord_id << "): " << e.what() << std::endl;
+    event.edit_original_response(dpp::message("Failed to unretire task. Contact the administrator to resolve this issue."));
   }
 }

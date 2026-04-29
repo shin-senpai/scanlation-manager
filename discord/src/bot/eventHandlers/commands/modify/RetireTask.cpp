@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/AddTask.hpp"
+#include "bot/eventHandlers/commands/modify/RetireTask.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"
@@ -17,7 +17,7 @@
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
 
-void Commands::addTask(Bot &bot, const dpp::slashcommand_t &event) {
+void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
@@ -41,14 +41,23 @@ void Commands::addTask(Bot &bot, const dpp::slashcommand_t &event) {
 
     const std::string name = std::get<std::string>(event.get_parameter("name"));
 
-    const int task_id = tasks_repo.create(session.wtx(), name);
+    const auto maybe_task = tasks_repo.findByName(session.wtx(), name);
+    if(!maybe_task) {
+      event.edit_original_response(dpp::message("Task **" + name + "** does not exist."));
+      return;
+    }
+
+    if(maybe_task->retired_at) {
+      event.edit_original_response(dpp::message("Task **" + name + "** is already retired."));
+      return;
+    }
+
+    tasks_repo.retire(session.wtx(), maybe_task->id);
     session.commit();
 
-    event.edit_original_response(dpp::message("Task **" + name + "** created with ID `" + std::to_string(task_id) + "`."));
-  } catch(const pqxx::unique_violation &) {
-    event.edit_original_response(dpp::message("A task with that name already exists."));
+    event.edit_original_response(dpp::message("Task **" + name + "** retired. Completion history is preserved."));
   } catch(const std::exception &e) {
-    std::cerr << "addTask failed for user (" << discord_id << "): " << e.what() << std::endl;
-    event.edit_original_response(dpp::message("Failed to create task. Contact the administrator to resolve this issue."));
+    std::cerr << "retireTask failed for user (" << discord_id << "): " << e.what() << std::endl;
+    event.edit_original_response(dpp::message("Failed to retire task. Contact the administrator to resolve this issue."));
   }
 }

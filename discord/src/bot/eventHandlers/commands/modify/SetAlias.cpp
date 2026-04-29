@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot//eventHandlers/commands/SetAlias.hpp"
+#include "bot//eventHandlers/commands/modify/SetAlias.hpp"
 
 // Standard Includes
 #include <iostream>

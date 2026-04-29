@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/SetProgressChannel.hpp"
+#include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"

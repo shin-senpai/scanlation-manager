@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/WorkProgress.hpp"
+#include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"

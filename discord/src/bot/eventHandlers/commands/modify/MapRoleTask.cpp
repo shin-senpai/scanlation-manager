@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/MapRoleTask.hpp"
+#include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"

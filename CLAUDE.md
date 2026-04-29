@@ -56,7 +56,11 @@ discord/
 │   ├── bot/
 │   │   ├── Bot.hpp
 │   │   ├── eventHandlers/
-│   │   │   ├── commands/         # One header per slash command
+│   │   │   ├── commands/
+│   │   │   │   ├── add/          # Commands that create new records
+│   │   │   │   ├── modify/       # Commands that update existing records
+│   │   │   │   ├── list/         # Read-only / query commands
+│   │   │   │   └── remove/       # Commands that delete records
 │   │   │   └── triggers/         # One header per message trigger
 │   │   └── utils/                # BotUtils, ChannelUtils
 │   ├── db/
@@ -71,9 +75,10 @@ discord/
 ```
 
 ### Adding a New Slash Command
-1. Add a header in `include/bot/eventHandlers/commands/MyCommand.hpp` and implementation in `src/bot/eventHandlers/commands/MyCommand.cpp`
-2. Register the command in `Bot::fillCommandMap()` in `Bot.cpp`
-3. CMake picks up new `.cpp` files automatically via `GLOB_RECURSE`
+1. Pick the right subdirectory under `commands/`: `add/`, `modify/`, `list/`, or `remove/`
+2. Add a header in `include/bot/eventHandlers/commands/<subdir>/MyCommand.hpp` and implementation in `src/bot/eventHandlers/commands/<subdir>/MyCommand.cpp`
+3. Register the command in `Bot::fillCommandMap()` in `Bot.cpp`
+4. CMake picks up new `.cpp` files automatically via `GLOB_RECURSE`
 
 ### Adding a New Repository
 1. Add header/impl under `include/db/repositories/` and `src/db/repositories/`

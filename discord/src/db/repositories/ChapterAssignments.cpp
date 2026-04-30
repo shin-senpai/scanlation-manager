@@ -68,16 +68,23 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByUser(pqxx::tr
   return buildResults(results);
 }
 
-bool ChapterAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id) {
-  auto result = txn.exec(
-      "SELECT 1 FROM chapter_assignments WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3 LIMIT 1",
-      pqxx::params(txn, user_id, chapter_id, task_id));
+bool ChapterAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id, std::optional<bool> completed) {
+  std::string query = "SELECT 1 FROM chapter_assignments WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3";
+  if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+  query += " LIMIT 1";
 
+  auto result = txn.exec(query, pqxx::params(txn, user_id, chapter_id, task_id));
   return !result.empty();
 }
 
 void ChapterAssignmentsRepository::setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id) {
   txn.exec(
       "UPDATE chapter_assignments SET completed_at = NOW() WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3",
+      pqxx::params(txn, user_id, chapter_id, task_id));
+}
+
+void ChapterAssignmentsRepository::clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id) {
+  txn.exec(
+      "UPDATE chapter_assignments SET completed_at = NULL WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3",
       pqxx::params(txn, user_id, chapter_id, task_id));
 }

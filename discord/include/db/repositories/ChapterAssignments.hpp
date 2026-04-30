@@ -20,7 +20,7 @@ public:
 
   void removeOutstandingByTask(pqxx::transaction_base &txn, int task_id);
 
-  bool exists(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
+  bool exists(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id, std::optional<bool> completed = std::nullopt);
 
   bool hasCompletedByTask(pqxx::transaction_base &txn, int task_id);
 
@@ -29,4 +29,6 @@ public:
   std::vector<ChapterAssignment> listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id = std::nullopt, std::optional<bool> completed = std::nullopt);
 
   void setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
+
+  void clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
 };

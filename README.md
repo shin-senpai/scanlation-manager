@@ -22,11 +22,11 @@ The database schema models all of the following. Bot commands and web UI to expo
 |--------|---------|
 | ✅ schema, ✅ db layer, ✅ bot | User registration — link Discord identities to team member accounts |
 | ✅ schema, ✅ db layer, ✅ bot | User aliases — track contributors under different names over time |
-| ✅ schema, ✅ db layer, 🚧 bot | User permissions — member, manager, and supermanager levels |
-| ✅ schema, ✅ db layer, 🚧 bot | Custom roles — define capabilities for team members |
-| ✅ schema, ✅ db layer, 🚧 bot | Custom tasks — define the steps required before a chapter can be released |
+| ✅ schema, ✅ db layer, ✅ bot | User permissions — member, manager, and supermanager levels |
+| ✅ schema, ✅ db layer, ✅ bot | Custom roles — define capabilities for team members |
+| ✅ schema, ✅ db layer, ✅ bot | Custom tasks — define the steps required before a chapter can be released |
 | ✅ schema, ✅ db layer, 🚧 bot | Task dependencies — specify which tasks block other tasks |
-| ✅ schema, ✅ db layer, 🚧 bot | Series & chapter tracking — track active series and per-chapter assignments |
+| ✅ schema, ✅ db layer, ✅ bot | Series & chapter tracking — track active series and per-chapter assignments |
 | ✅ schema, ✅ db layer, 🚧 bot | Contribution history — record who completed which task, for which chapter, and when |
 | 🚧 bot | To-do lists — see which tasks are outstanding and who is responsible |
 | 🚧 bot | Release summaries — query releases with sorting and filtering |

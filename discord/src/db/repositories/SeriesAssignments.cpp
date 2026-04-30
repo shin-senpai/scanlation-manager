@@ -13,6 +13,14 @@ void SeriesAssignmentsRepository::remove(pqxx::transaction_base &txn, int user_i
       pqxx::params(txn, user_id, series_id, task_id));
 }
 
+bool SeriesAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_id, int series_id, int task_id) {
+  auto result = txn.exec(
+      "SELECT 1 FROM series_assignments WHERE user_id = $1 AND series_id = $2 AND task_id = $3 LIMIT 1",
+      pqxx::params(txn, user_id, series_id, task_id));
+
+  return !result.empty();
+}
+
 void SeriesAssignmentsRepository::removeAllByTask(pqxx::transaction_base &txn, int task_id) {
   txn.exec(
       "DELETE FROM series_assignments WHERE task_id = $1",

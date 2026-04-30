@@ -6,6 +6,7 @@ Chapter rowToChapter(const pqxx::row &row) {
   return Chapter{
       row["id"].as<int>(),
       row["series_id"].as<int>(),
+      row["volume"].is_null() ? std::nullopt : std::make_optional(row["volume"].as<int>()),
       row["number"].as<double>(),
       row["name"].as<std::string>(),
       chapterStatusFromString(row["status"].as<std::string>()),
@@ -14,17 +15,17 @@ Chapter rowToChapter(const pqxx::row &row) {
 }
 }
 
-int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name) {
+int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name, std::optional<int> volume) {
   auto result = txn.exec(
-      "INSERT INTO chapters (series_id, number, name) VALUES ($1, $2, $3) RETURNING id",
-      pqxx::params(txn, series_id, number, name));
+      "INSERT INTO chapters (series_id, number, name, volume) VALUES ($1, $2, $3, $4) RETURNING id",
+      pqxx::params(txn, series_id, number, name, volume));
 
   return result[0]["id"].as<int>();
 }
 
 std::optional<Chapter> ChaptersRepository::findById(pqxx::transaction_base &txn, int id) {
   auto result = txn.exec(
-      "SELECT id, series_id, number, name, status, added_at, closed_at FROM chapters WHERE id = $1",
+      "SELECT id, series_id, volume, number, name, status, added_at, closed_at FROM chapters WHERE id = $1",
       pqxx::params(txn, id));
 
   if(result.empty()) {
@@ -36,7 +37,7 @@ std::optional<Chapter> ChaptersRepository::findById(pqxx::transaction_base &txn,
 
 std::optional<Chapter> ChaptersRepository::findByName(pqxx::transaction_base &txn, int series_id, std::string_view name) {
   auto result = txn.exec(
-      "SELECT id, series_id, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1 AND name = $2",
+      "SELECT id, series_id, volume, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1 AND name = $2",
       pqxx::params(txn, series_id, name));
 
   if(result.empty()) {
@@ -48,7 +49,7 @@ std::optional<Chapter> ChaptersRepository::findByName(pqxx::transaction_base &tx
 
 std::optional<Chapter> ChaptersRepository::findByNumber(pqxx::transaction_base &txn, int series_id, double number) {
   auto result = txn.exec(
-      "SELECT id, series_id, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1 AND number = $2",
+      "SELECT id, series_id, volume, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1 AND number = $2",
       pqxx::params(txn, series_id, number));
 
   if(result.empty()) {
@@ -59,7 +60,7 @@ std::optional<Chapter> ChaptersRepository::findByNumber(pqxx::transaction_base &
 }
 
 std::vector<Chapter> ChaptersRepository::listBySeries(pqxx::transaction_base &txn, int series_id, std::optional<std::variant<ChapterStatus, bool>> filter) {
-  std::string query = "SELECT id, series_id, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1";
+  std::string query = "SELECT id, series_id, volume, number, name, status, added_at, closed_at FROM chapters WHERE series_id = $1";
   pqxx::result results;
 
   if(filter && std::holds_alternative<ChapterStatus>(*filter)) {

@@ -12,8 +12,8 @@ A management platform for scanlation groups. Built as a monorepo where a shared 
 scanlation-manager/
 ├── discord/     # C++ Discord bot — primary active module
 ├── db/          # PostgreSQL schema (migrations + Docker Compose)
-├── backend/     # REST API — not yet implemented (placeholder)
-└── frontend/    # Web UI — not yet implemented (placeholder)
+├── backend/     # Go REST API — external storage integrations (Google Drive, S3)
+└── frontend/    # Web UI — not yet started
 ```
 
 ---
@@ -43,10 +43,10 @@ The bot reads `discord/config.json` (copied to `build/config.json` at build time
 cp discord/config.json.example discord/config.json
 ```
 
-Required keys: `discord_bot_token`, `guild_id`, `database`
-Optional keys: `work_progress_channel`, `gsheet_auth_token`, `gsheet_priv_api_url`
+Required keys: `discord_bot_token`, `guild_id`, `db_connection_string`, `db_pool_size`
+Optional keys: `work_progress_channel`, `staff_role_id`, `gsheet_auth_token`, `gsheet_priv_api_url`
 
-The `database` value is a libpq connection string, e.g.:
+The `db_connection_string` value is a libpq connection string, e.g.:
 `"host=localhost port=5432 dbname=scanlation user=postgres password=secret"`
 
 ### Source Layout
@@ -60,7 +60,8 @@ discord/
 │   │   │   │   ├── add/          # Commands that create new records
 │   │   │   │   ├── modify/       # Commands that update existing records
 │   │   │   │   ├── list/         # Read-only / query commands
-│   │   │   │   └── remove/       # Commands that delete records
+│   │   │   │   ├── remove/       # Commands that delete records
+│   │   │   │   └── manage/       # Multi-operation entity commands (e.g. /series, /chapter)
 │   │   │   └── triggers/         # One header per message trigger
 │   │   └── utils/                # BotUtils, ChannelUtils
 │   ├── db/
@@ -75,14 +76,14 @@ discord/
 ```
 
 ### Adding a New Slash Command
-1. Pick the right subdirectory under `commands/`: `add/`, `modify/`, `list/`, or `remove/`
+1. Pick the right subdirectory under `commands/`: `add/`, `modify/`, `list/`, `remove/`, or `manage/` (for commands that span multiple operation types via subcommands)
 2. Add a header in `include/bot/eventHandlers/commands/<subdir>/MyCommand.hpp` and implementation in `src/bot/eventHandlers/commands/<subdir>/MyCommand.cpp`
 3. Register the command in `Bot::fillCommandMap()` in `Bot.cpp`
 4. CMake picks up new `.cpp` files automatically via `GLOB_RECURSE`
 
 ### Adding a New Repository
 1. Add header/impl under `include/db/repositories/` and `src/db/repositories/`
-2. Use a `DbSession` obtained from `Bot::getDb().session()` — call `session->commit()` on success; the destructor releases the connection automatically
+2. In a command handler, construct `DbSession session(bot.getPool())` — call `session.commit()` on success; the destructor releases the connection back to the pool automatically
 
 ### Code Style
 Enforced by `.clang-format` (run `clang-format -i` on changed files):
@@ -145,7 +146,23 @@ psql "$DATABASE_URL" -f db/migrations/020_add_volume_to_chapters.sql
 | `/ping` | Done |
 | `/register` | Done |
 | `/set-progress-channel` | Done |
+| `/set-staff-role` | Done |
 | `/set-alias` | Done |
+| `/add-role` | Done |
+| `/add-task` | Done |
+| `/assign-role` | Done |
+| `/remove-role` | Done |
+| `/delete-role` | Done |
+| `/delete-task` | Done |
+| `/retire-task` | Done |
+| `/unretire-task` | Done |
+| `/map-role-task` | Done |
+| `/remove-role-task` | Done |
+| `/list-roles` | Done |
+| `/list-tasks` | Done |
+| `/list-role-tasks` | Done |
+| `/series` (add, set-status, assign, unassign) | Done |
+| `/chapter` (add, set-status, assign, unassign, uncomplete) | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

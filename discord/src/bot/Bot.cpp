@@ -24,25 +24,26 @@
 
 // Commands
 #include "bot/eventHandlers/commands/add/AddRole.hpp"
-#include "bot/eventHandlers/commands/add/AddSeries.hpp"
 #include "bot/eventHandlers/commands/add/AddTask.hpp"
-#include "bot/eventHandlers/commands/modify/AssignRole.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/add/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/list/ListRoleTasks.hpp"
 #include "bot/eventHandlers/commands/list/ListRoles.hpp"
 #include "bot/eventHandlers/commands/list/ListTasks.hpp"
-#include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/list/Ping.hpp"
-#include "bot/eventHandlers/commands/add/RegisterUser.hpp"
-#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
-#include "bot/eventHandlers/commands/remove/RemoveRoleTask.hpp"
+#include "bot/eventHandlers/commands/manage/Chapter.hpp"
+#include "bot/eventHandlers/commands/manage/Series.hpp"
+#include "bot/eventHandlers/commands/modify/AssignRole.hpp"
+#include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/modify/RetireTask.hpp"
 #include "bot/eventHandlers/commands/modify/SetAlias.hpp"
 #include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
+#include "bot/eventHandlers/commands/remove/RemoveRoleTask.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -54,7 +55,7 @@ void Bot::fillCommandMap() {
       [this](const dpp::slashcommand_t &e) { Commands::setProgressChannel(*this, e); },
       {dpp::command_option(dpp::co_channel, "channel", "Work Progress Channel", true).add_channel_type(dpp::CHANNEL_TEXT)}};
 
-    m_commands["set-staff-role"] = {
+  m_commands["set-staff-role"] = {
       "Sets the staff role",
       [this](const dpp::slashcommand_t &e) { Commands::setStaffRole(*this, e); },
       {dpp::command_option(dpp::co_role, "role", "Staff Roles", true)}};
@@ -88,10 +89,68 @@ void Bot::fillCommandMap() {
       [this](const dpp::slashcommand_t &e) { Commands::addTask(*this, e); },
       {dpp::command_option(dpp::co_string, "name", "Name of the task", true)}};
 
-  m_commands["add-series"] = {
-      "Add a new series",
-      [this](const dpp::slashcommand_t &e) { Commands::addSeries(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the series", true)}};
+  m_commands["series"] = {
+      "Manage a series",
+      [this](const dpp::slashcommand_t &e) { Commands::series(*this, e); },
+      {
+          dpp::command_option(dpp::co_sub_command, "add", "Add a new series")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Name of the series", true)),
+          dpp::command_option(dpp::co_sub_command, "set-status", "Update series status")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "status", "New status", true)
+                              .add_choice(dpp::command_option_choice("Active", std::string("active")))
+                              .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus")))
+                              .add_choice(dpp::command_option_choice("Completed", std::string("completed")))
+                              .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))),
+          dpp::command_option(dpp::co_sub_command, "assign", "Add a user to this series' default crew")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "user", "User to assign", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "unassign", "Remove a user from this series' default crew")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "user", "User to unassign", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::seriesAutocomplete(*this, key, input, e);
+      }};
+
+  m_commands["chapter"] = {
+      "Manage a chapter",
+      [this](const dpp::slashcommand_t &e) { Commands::chapter(*this, e); },
+      {
+          dpp::command_option(dpp::co_sub_command, "add", "Add a chapter to a series")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_number, "number", "Chapter number (e.g. 51 or 51.1)", true))
+              .add_option(dpp::command_option(dpp::co_string, "name", "Display name (e.g. Ch 51)", true))
+              .add_option(dpp::command_option(dpp::co_integer, "volume", "Volume number", false)),
+          dpp::command_option(dpp::co_sub_command, "set-status", "Update chapter status")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "status", "New status", true)
+                              .add_choice(dpp::command_option_choice("In Progress", std::string("in_progress")))
+                              .add_choice(dpp::command_option_choice("Released", std::string("released")))
+                              .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus")))
+                              .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))),
+          dpp::command_option(dpp::co_sub_command, "assign", "Assign a user to this chapter for a task")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "user", "User to assign", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "unassign", "Remove a user from this chapter for a task")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "user", "User to unassign", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "uncomplete", "Mark a completed task assignment as outstanding again")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "user", "User whose assignment to reset", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::chapterAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["assign-role"] = {
       "Assign a role to a user",
@@ -179,7 +238,7 @@ static bool isAdmin(const dpp::snowflake guild_id, const dpp::snowflake user_id,
 
   for(const auto &role_id : roles) {
     dpp::role *role = dpp::find_role(role_id);
-    if(!role){
+    if(!role) {
       continue;
     }
     if(role->has_manage_guild() || role->has_administrator()) {
@@ -255,20 +314,41 @@ Bot::Bot(ConfigManager &cfg)
   });
 
   m_core.on_autocomplete([this](const dpp::autocomplete_t &event) {
+    const auto &roles = event.command.member.get_roles();
+    if(!hasRole(roles, m_staff_role_id) && !isAdmin(event.command.guild_id, event.command.member.user_id, roles)) {
+      dpp::interaction_response r(dpp::ir_autocomplete_reply);
+      m_core.interaction_response_create(event.command.id, event.command.token, r);
+      return;
+    }
+
     auto it = this->m_commands.find(event.name);
     if(it == m_commands.end() || !it->second.autocomplete_handler) {
       return;
     }
 
+    auto dispatch = [&](const std::string &key, const dpp::command_option &opt) {
+      std::string input{};
+      try {
+        input = std::get<std::string>(opt.value);
+      } catch(std::exception &e) {
+        std::cerr << "Failed to get autocomplete value for " << event.name << "/" << key << ": " << e.what() << std::endl;
+      }
+      it->second.autocomplete_handler(key, input, event);
+    };
+
     for(const auto &option : event.options) {
-      if(option.focused) {
-        std::string input{};
-        try {
-          input = std::get<std::string>(option.value);
-        } catch(std::exception &e) {
-          std::cerr << "Failed to get option's value for autocomplete event: " << event.name << " due to exception: " << e.what() << std::endl;
+      if(option.type == dpp::co_sub_command) {
+        // Focused option is one level deeper, inside the subcommand
+        for(const auto &sub_opt : option.options) {
+          if(sub_opt.focused) {
+            dispatch(option.name + "/" + sub_opt.name, sub_opt);
+            return;
+          }
         }
-        it->second.autocomplete_handler(option.name, input, event);
+        return;
+      }
+      if(option.focused) {
+        dispatch(option.name, option);
         return;
       }
     }

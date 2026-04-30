@@ -15,7 +15,7 @@
 
 class ChaptersRepository {
 public:
-  int create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name);
+  int create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name, std::optional<int> volume = std::nullopt);
 
   std::optional<Chapter> findById(pqxx::transaction_base &txn, int id);
 

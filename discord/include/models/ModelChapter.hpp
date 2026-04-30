@@ -10,6 +10,7 @@
 struct Chapter {
   int id;
   int series_id;
+  std::optional<int> volume;
   double number;
   std::string name;
   ChapterStatus status;

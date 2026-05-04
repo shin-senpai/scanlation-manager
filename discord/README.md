@@ -98,7 +98,7 @@ The bot reads from a `config.json` file at the working directory. The following 
 | `discord_bot_token` | ✅ | `string` | Your Discord bot token |
 | `guild_id` | ✅ | `uint64` | The Discord server (guild) ID to register commands to |
 | `db_connection_string` | ✅ | `string` | PostgreSQL connection string (libpq format) |
-| `db_pool_size` | ✅ | `int` | Number of database connections to maintain in the pool |
+| `db_pool_size` | ✅ | `size_t` | Number of database connections to maintain in the pool |
 | `work_progress_channel` | ❌ | `uint64` | Channel ID for progress message trigger (can be set via `/set-progress-channel`) |
 | `staff_role_id` | ❌ | `uint64` | Discord role ID required to use the bot (can be set via `/set-staff-role`) |
 | `gsheet_auth_token` | ❌ | `string` | Auth token for Google Sheets private API (future use) |

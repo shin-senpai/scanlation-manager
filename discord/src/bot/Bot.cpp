@@ -43,7 +43,7 @@
 #include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
 #include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
 #include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
-#include "bot/eventHandlers/commands/remove/RemoveRoleTask.hpp"
+#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -201,9 +201,9 @@ void Bot::fillCommandMap() {
       "List all tasks",
       [this](const dpp::slashcommand_t &e) { Commands::listTasks(*this, e); }};
 
-  m_commands["remove-role-task"] = {
-      "Remove a role-task mapping",
-      [this](const dpp::slashcommand_t &e) { Commands::removeRoleTask(*this, e); },
+  m_commands["unmap-role-task"] = {
+      "Unmap a role-task mapping",
+      [this](const dpp::slashcommand_t &e) { Commands::unmapRoleTask(*this, e); },
       {
           dpp::command_option(dpp::co_string, "role", "Name of the role", true),
           dpp::command_option(dpp::co_string, "task", "Name of the task", true),

@@ -1,5 +1,5 @@
 // Associated Header Include
-#include "bot/eventHandlers/commands/remove/RemoveRoleTask.hpp"
+#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 
 // User Defined Includes
 #include "bot/Bot.hpp"
@@ -19,7 +19,7 @@
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
 
-void Commands::removeRoleTask(Bot &bot, const dpp::slashcommand_t &event) {
+void Commands::unmapRoleTask(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
@@ -68,7 +68,7 @@ void Commands::removeRoleTask(Bot &bot, const dpp::slashcommand_t &event) {
 
     event.edit_original_response(dpp::message("Removed mapping between role **" + role_name + "** and task **" + task_name + "**."));
   } catch(const std::exception &e) {
-    std::cerr << "removeRoleTask failed for user (" << discord_id << "): " << e.what() << std::endl;
+    std::cerr << "unmapRoleTask failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("Failed to remove role-task mapping. Contact the administrator to resolve this issue."));
   }
 }

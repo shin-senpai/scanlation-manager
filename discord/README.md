@@ -36,7 +36,7 @@ scanlation-manager/
 | ✅ | `/retire-task` — Soft-retire a task, preserving its history |
 | ✅ | `/unretire-task` — Restore a retired task to active status |
 | ✅ | `/map-role-task` — Map a role to a task it is responsible for |
-| ✅ | `/remove-role-task` — Remove a role-task mapping |
+| ✅ | `/unmap-role-task` — Remove a role-task mapping |
 | ✅ | `/list-roles` — List all roles |
 | ✅ | `/list-tasks` — List all tasks |
 | ✅ | `/list-role-tasks` — List all role-task mappings |
@@ -203,7 +203,7 @@ Restores a retired task to active status. Manager+.
 ### `/map-role-task [role] [task]`
 Maps a role to a task it is responsible for. A user must have a role with this mapping to be assigned to that task. Manager+.
 
-### `/remove-role-task [role] [task]`
+### `/unmap-role-task [role] [task]`
 Removes a role-task mapping. Manager+.
 
 ### `/list-roles`

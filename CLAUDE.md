@@ -158,7 +158,7 @@ psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 | `/retire-task` | Done |
 | `/unretire-task` | Done |
 | `/map-role-task` | Done |
-| `/remove-role-task` | Done |
+| `/unmap-role-task` | Done |
 | `/list-roles` | Done |
 | `/list-tasks` | Done |
 | `/list-role-tasks` | Done |

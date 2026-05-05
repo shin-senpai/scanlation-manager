@@ -69,3 +69,9 @@ void SeriesRepository::updateStatus(pqxx::transaction_base &txn, int id, SeriesS
       "UPDATE series SET status = $2, closed_at = CASE WHEN $2 in ('active', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",
       pqxx::params(txn, id, seriesStatusToString(status)));
 }
+
+void SeriesRepository::remove(pqxx::transaction_base &txn, int series_id) {
+  txn.exec(
+      "DELETE FROM series WHERE id = $1",
+      pqxx::params(txn, series_id));
+}

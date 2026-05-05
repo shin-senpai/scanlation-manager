@@ -26,4 +26,6 @@ public:
   std::vector<Chapter> listBySeries(pqxx::transaction_base &txn, int series_id, std::optional<std::variant<ChapterStatus, bool>> filter = std::nullopt);
 
   void updateStatus(pqxx::transaction_base &txn, int id, ChapterStatus status);
+
+  void remove(pqxx::transaction_base &txn, int chapter_id);
 };

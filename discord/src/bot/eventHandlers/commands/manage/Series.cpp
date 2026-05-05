@@ -4,6 +4,7 @@
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/RoleTasks.hpp"
 #include "db/repositories/Series.hpp"
@@ -158,6 +159,38 @@ void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
       "<@" + std::to_string(target_discord_id) + "> removed from **" + series_name + "** for **" + task_name + "**."));
 }
 
+void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
+  SeriesRepository series_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("name"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  if(user_perm < Permission::supermanager && chapter_assignments_repo.hasCompletedBySeries(session.wtx(), maybe_series->id)) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** has chapters with completed assignments. Only a supermanager can delete it."));
+    return;
+  }
+
+  if(user_perm >= Permission::supermanager) {
+    // Clear completed_at on all chapter_assignments in this series before the
+    // delete so the immutability trigger doesn't fire on the cascaded removal.
+    chapter_assignments_repo.clearAllCompletedBySeries(session.wtx(), maybe_series->id);
+  }
+
+  // Cascades: series → series_assignments, series → chapters → chapter_assignments.
+  series_repo.remove(session.wtx(), maybe_series->id);
+  session.commit();
+
+  event.edit_original_response(dpp::message(
+      "Series **" + series_name + "** and all its chapters have been deleted."));
+}
+
 } // namespace
 
 void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
@@ -181,7 +214,8 @@ void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    if(user_repo.getPermissionLevel(session.wtx(), *maybe_user_id) < Permission::manager) {
+    const Permission user_perm = user_repo.getPermissionLevel(session.wtx(), *maybe_user_id);
+    if(user_perm < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action."));
       return;
     }
@@ -194,6 +228,8 @@ void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
       doAssign(event, session);
     else if(sub == "unassign")
       doUnassign(event, session);
+    else if(sub == "remove")
+      doRemove(event, session, user_perm);
   } catch(const std::exception &e) {
     std::cerr << "series/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("An error occurred. Contact the administrator to resolve this issue."));
@@ -212,7 +248,7 @@ void Commands::seriesAutocomplete(Bot &bot, const std::string &key, const std::s
     };
     const std::string lower_input = to_lower(input);
 
-    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name") {
+    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name" || key == "remove/name") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {

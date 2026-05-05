@@ -24,6 +24,14 @@ public:
 
   bool hasCompletedByTask(pqxx::transaction_base &txn, int task_id);
 
+  bool hasCompletedByChapter(pqxx::transaction_base &txn, int chapter_id);
+
+  bool hasCompletedBySeries(pqxx::transaction_base &txn, int series_id);
+
+  void clearAllCompletedByChapter(pqxx::transaction_base &txn, int chapter_id);
+
+  void clearAllCompletedBySeries(pqxx::transaction_base &txn, int series_id);
+
   std::vector<ChapterAssignment> listByChapter(pqxx::transaction_base &txn, int chapter_id, std::optional<int> task_id = std::nullopt, std::optional<bool> completed = std::nullopt);
 
   std::vector<ChapterAssignment> listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id = std::nullopt, std::optional<bool> completed = std::nullopt);

@@ -86,3 +86,10 @@ void ChaptersRepository::updateStatus(pqxx::transaction_base &txn, int id, Chapt
       "UPDATE chapters SET status = $2, closed_at = CASE WHEN $2 IN ('in_progress', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",
       pqxx::params(txn, id, chapterStatusToString(status)));
 }
+
+void ChaptersRepository::remove(pqxx::transaction_base &txn, int chapter_id) {
+  txn.exec(
+      "DELETE FROM chapters WHERE id = $1",
+      pqxx::params(txn, chapter_id));
+}
+

@@ -40,6 +40,37 @@ bool ChapterAssignmentsRepository::hasCompletedByTask(pqxx::transaction_base &tx
   return !result.empty();
 }
 
+bool ChapterAssignmentsRepository::hasCompletedByChapter(pqxx::transaction_base &txn, int chapter_id) {
+  auto result = txn.exec(
+      "SELECT 1 FROM chapter_assignments WHERE chapter_id = $1 AND completed_at IS NOT NULL LIMIT 1",
+      pqxx::params(txn, chapter_id));
+
+  return !result.empty();
+}
+
+bool ChapterAssignmentsRepository::hasCompletedBySeries(pqxx::transaction_base &txn, int series_id) {
+  auto result = txn.exec(
+      "SELECT 1 FROM chapter_assignments ca "
+      "JOIN chapters c ON c.id = ca.chapter_id "
+      "WHERE c.series_id = $1 AND ca.completed_at IS NOT NULL LIMIT 1",
+      pqxx::params(txn, series_id));
+
+  return !result.empty();
+}
+
+void ChapterAssignmentsRepository::clearAllCompletedByChapter(pqxx::transaction_base &txn, int chapter_id) {
+  txn.exec(
+      "UPDATE chapter_assignments SET completed_at = NULL WHERE chapter_id = $1",
+      pqxx::params(txn, chapter_id));
+}
+
+void ChapterAssignmentsRepository::clearAllCompletedBySeries(pqxx::transaction_base &txn, int series_id) {
+  txn.exec(
+      "UPDATE chapter_assignments SET completed_at = NULL "
+      "WHERE chapter_id IN (SELECT id FROM chapters WHERE series_id = $1)",
+      pqxx::params(txn, series_id));
+}
+
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx::transaction_base &txn, int chapter_id, std::optional<int> task_id, std::optional<bool> completed) {
   std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE chapter_id = $1";
   if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";

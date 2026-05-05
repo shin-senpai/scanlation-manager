@@ -135,7 +135,7 @@ Individual chapters belonging to a series.
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
-| `series_id` | `INT` | No | — | FK → `series(id)` |
+| `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
 | `volume` | `INT` | Yes | — | Volume number, if the series uses a volume structure. `NULL` = not part of a named volume (e.g. web release). Not unique — multiple chapters share the same volume. |
 | `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
 | `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
@@ -208,7 +208,7 @@ Which users are assigned to a series for a given task — the default crew. Used
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `user_id` | `INT` | No | — | FK → `users(id)` |
-| `series_id` | `INT` | No | — | FK → `series(id)` |
+| `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
 | `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE |
 
 **PK:** `(user_id, series_id, task_id)`
@@ -225,7 +225,7 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `user_id` | `INT` | No | — | FK → `users(id)` |
-| `chapter_id` | `INT` | No | — | FK → `chapters(id)` |
+| `chapter_id` | `INT` | No | — | FK → `chapters(id)` ON DELETE CASCADE |
 | `task_id` | `INT` | No | — | FK → `tasks(id)` |
 | `completed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = outstanding; non-null = done, value is the completion timestamp |
 
@@ -270,6 +270,6 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 - **Roles vs tasks:** `roles` describe what a user *can* do. `tasks` describe the steps a chapter requires. `role_tasks` connects them for assignment validation. Assignments themselves (`series_assignments`, `chapter_assignments`) are task-scoped — not role-scoped — to avoid ambiguity.
 - **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion timestamp in one column. To-do list = `WHERE completed_at IS NULL`; history = `WHERE completed_at IS NOT NULL`.
 - **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved. Tasks follow a hybrid approach: hard-deleted if they have no completion history, soft-deleted (`retired_at`) otherwise to preserve the record.
-- **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, and `task_dependencies`. `chapter_assignments` is intentionally excluded from cascade — it is historical data and must be managed explicitly (retire the task instead of deleting it).
+- **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, and `task_dependencies`. Deleting a series cascades to `series_assignments` and `chapters`; deleting a chapter cascades to `chapter_assignments`. The `chapter_assignments` cascade fires the immutability trigger, so application code must `NULL` out `completed_at` on any completed rows before deleting a chapter or series with completion history (supermanager path only — managers are blocked from deleting anything with completed history). `chapter_assignments.task_id` has no cascade — tasks with completion history must be retired rather than deleted to preserve the record.
 - **Case insensitivity:** `citext` columns compare and enforce uniqueness case-insensitively but store values exactly as inserted. `PR` and `pr` cannot coexist; a lookup for either finds the same row.
 - **Name normalization:** `roles.name` and `tasks.name` are additionally normalized to uppercase on write via a `BEFORE INSERT OR UPDATE` trigger. Any casing passed in (`pR`, `pr`, `PR`) is stored and returned as `PR`. `series.name` and `chapters.name` are excluded — those are display names where casing is meaningful.

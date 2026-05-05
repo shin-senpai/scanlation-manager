@@ -25,4 +25,6 @@ public:
 
   // Also updates closed_at: sets it to NOW() when status is not active, clears it when active.
   void updateStatus(pqxx::transaction_base &txn, int id, SeriesStatus status);
+
+  void remove(pqxx::transaction_base &txn, int series_id);
 };

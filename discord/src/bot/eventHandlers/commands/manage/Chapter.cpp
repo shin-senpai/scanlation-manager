@@ -283,6 +283,46 @@ void doUncomplete(const dpp::slashcommand_t &event, DbSession &session) {
       "**" + task_name + "** marked as outstanding for <@" + std::to_string(target_discord_id) + "> on **" + chapter_name + "**."));
 }
 
+void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
+  SeriesRepository series_repo;
+  ChaptersRepository chapters_repo;
+  ChapterAssignmentsRepository assignments_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+  const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  if(!maybe_chapter) {
+    event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(user_perm < Permission::supermanager && assignments_repo.hasCompletedByChapter(session.wtx(), maybe_chapter->id)) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** has completed assignments. Only a supermanager can delete it."));
+    return;
+  }
+
+  if(user_perm >= Permission::supermanager) {
+    // Clear completed_at before the delete so the immutability trigger
+    // doesn't fire on the cascaded chapter_assignments removal.
+    assignments_repo.clearAllCompletedByChapter(session.wtx(), maybe_chapter->id);
+  }
+
+  // Cascades to chapter_assignments via ON DELETE CASCADE.
+  chapters_repo.remove(session.wtx(), maybe_chapter->id);
+  session.commit();
+
+  event.edit_original_response(dpp::message(
+      "Chapter **" + chapter_name + "** deleted from **" + series_name + "**."));
+}
+
 } // namespace
 
 void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
@@ -306,7 +346,8 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    if(user_repo.getPermissionLevel(session.wtx(), *maybe_user_id) < Permission::manager) {
+    const Permission user_perm = user_repo.getPermissionLevel(session.wtx(), *maybe_user_id);
+    if(user_perm < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action."));
       return;
     }
@@ -321,6 +362,8 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       doUnassign(event, session);
     else if(sub == "uncomplete")
       doUncomplete(event, session);
+    else if(sub == "remove")
+      doRemove(event, session, user_perm);
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("An error occurred. Contact the administrator to resolve this issue."));
@@ -340,7 +383,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
     const std::string lower_input = to_lower(input);
 
     // Series name options
-    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series") {
+    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
@@ -349,7 +392,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
       }
     }
     // Chapter name options — filters based on the already-typed series
-    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter") {
+    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter") {
       const std::string series_ctx = getAutocompleteContext(event, "series");
       if(!series_ctx.empty()) {
         SeriesRepository series_repo;

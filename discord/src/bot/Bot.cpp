@@ -110,6 +110,8 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_user, "user", "User to unassign", true))
               .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "remove", "Delete a series and all its chapters")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::seriesAutocomplete(*this, key, input, e);
@@ -147,6 +149,9 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_user, "user", "User whose assignment to reset", true))
               .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "remove", "Delete a chapter and all its assignments")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::chapterAutocomplete(*this, key, input, e);

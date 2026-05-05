@@ -40,8 +40,10 @@ scanlation-manager/
 | ✅ | `/list-roles` — List all roles |
 | ✅ | `/list-tasks` — List all tasks |
 | ✅ | `/list-role-tasks` — List all role-task mappings |
-| ✅ | `/series` — Manage series: add, set-status, assign/unassign default crew |
-| ✅ | `/chapter` — Manage chapters: add, set-status, assign/unassign/uncomplete |
+| ✅ | `/series` — Manage series: add, set-status, assign/unassign default crew, remove |
+| ✅ | `/chapter` — Manage chapters: add, set-status, assign/unassign/uncomplete/remove |
+| ✅ | `/list-series` — List series with chapter counts and latest activity, optional status filter |
+| ✅ | `/list-chapters` — List chapters with task completion stats, optional series/status/sort |
 | ✅ | Work progress message trigger — Parses and echoes structured progress updates |
 | 🚧 | `/work-update` — Slash command to submit a work progress update (autocomplete hardcoded) |
 | 🚧 | Google Sheets integration — Sync progress data to a spreadsheet |
@@ -134,9 +136,16 @@ https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applicat
 
 ```bash
 cd discord
+
+# Debug (default)
 cmake --preset default
 cmake --build --preset default
-./build/scanlation-manager
+./build/debug/scanlation-manager   # config.json is auto-copied to build/debug/ on build
+
+# Release
+cmake --preset release
+cmake --build --preset release
+./build/release/scanlation-manager
 ```
 
 ---
@@ -222,6 +231,7 @@ Multi-subcommand for managing series. Manager+.
 - **`set-status [name] [status]`** — Update series status (`active`, `hiatus`, `completed`, `dropped`). Autocomplete on name.
 - **`assign [name] [user] [task]`** — Add a user to the series' default crew for a task. The user must have a role mapped to that task. New chapters added to this series will automatically inherit these assignments.
 - **`unassign [name] [user] [task]`** — Remove a user from the default crew.
+- **`remove [name]`** — Delete a series and all its chapters. Manager can remove series with no completed assignments; Supermanager can remove any series (completed assignments are cleared first). Autocomplete on name.
 
 ### `/chapter`
 Multi-subcommand for managing chapters. Manager+.
@@ -231,6 +241,22 @@ Multi-subcommand for managing chapters. Manager+.
 - **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a specific task. The user must have a role mapped to that task.
 - **`unassign [series] [chapter] [user] [task]`** — Remove an assignment. Cannot remove a completed assignment — use `uncomplete` first.
 - **`uncomplete [series] [chapter] [user] [task]`** — Mark a completed assignment as outstanding again. Only allowed when the chapter status is `in_progress`.
+- **`remove [series] [chapter]`** — Delete a chapter and all its assignments. Manager can remove chapters with no completed assignments; Supermanager can remove any chapter. Autocomplete on series and chapter name.
+
+### `/list-series [status?]`
+Lists all series sorted chronologically by latest chapter activity (falls back to alphabetical when no chapters exist). Each entry shows chapter count and the date of the latest relevant chapter. Manager+.
+
+- **`status`** — Optional filter: `active`, `completed`, `dropped`, `hiatus`. When filtering by `completed`, the timestamp shown is from the latest *released* chapter; for `dropped`/`hiatus`, the respective chapter status is used.
+- Results are paginated (10 per page). Use the ◀ ▶ reactions to navigate — only the user who ran the command can page through results.
+
+### `/list-chapters [series?] [status?] [sort?]`
+Lists chapters with task completion progress (`X/Y tasks`). Manager+.
+
+- **`series`** — Optional filter: restrict to one series (autocomplete).
+- **`status`** — Optional filter: `in_progress`, `released`, `dropped`, `hiatus`.
+- **`sort`** — `number` (default, ascending by chapter number) or `chronological` (`closed_at DESC NULLS LAST`).
+- When no series filter is applied, each entry is prefixed with the series name.
+- Results are paginated (10 per page) with ◀ ▶ reactions.
 
 ### `/work-update` *(in progress)*
 Allows staff to submit a work update via slash command with autocomplete for series, chapter, and task. Autocomplete options are currently hardcoded placeholders.

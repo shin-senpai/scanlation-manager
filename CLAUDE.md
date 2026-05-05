@@ -30,9 +30,16 @@ scanlation-manager/
 ### Build
 ```bash
 cd discord
+
+# Debug (default)
 cmake --preset default
 cmake --build --preset default
-./build/scanlation-manager   # config.json is auto-copied to build/ on build
+./build/debug/scanlation-manager   # config.json is auto-copied to build/debug/ on build
+
+# Release
+cmake --preset release
+cmake --build --preset release
+./build/release/scanlation-manager
 ```
 
 Dependencies D++ and libpqxx are fetched automatically by CMake on first build. nlohmann_json and libcurl must be installed on the system.
@@ -162,8 +169,10 @@ psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 | `/list-roles` | Done |
 | `/list-tasks` | Done |
 | `/list-role-tasks` | Done |
-| `/series` (add, set-status, assign, unassign) | Done |
-| `/chapter` (add, set-status, assign, unassign, uncomplete) | Done |
+| `/series` (add, set-status, assign, unassign, remove) | Done |
+| `/chapter` (add, set-status, assign, unassign, uncomplete, remove) | Done |
+| `/list-series` | Done |
+| `/list-chapters` | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

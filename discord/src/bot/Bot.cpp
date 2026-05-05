@@ -7,6 +7,7 @@
 
 // Standard Includes
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <exception>
 #include <string>
@@ -24,6 +25,8 @@
 
 // Commands
 #include "bot/eventHandlers/commands/add/AddRole.hpp"
+#include "bot/eventHandlers/commands/list/ListChapters.hpp"
+#include "bot/eventHandlers/commands/list/ListSeries.hpp"
 #include "bot/eventHandlers/commands/add/AddTask.hpp"
 #include "bot/eventHandlers/commands/add/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/list/ListRoleTasks.hpp"
@@ -220,6 +223,35 @@ void Bot::fillCommandMap() {
   m_commands["list-role-tasks"] = {
       "List all Role to Task mappings",
       [this](const dpp::slashcommand_t &e) { Commands::listRoleTasks(*this, e); }};
+
+  m_commands["list-series"] = {
+      "List all series with chapter activity",
+      [this](const dpp::slashcommand_t &e) { Commands::listSeries(*this, e); },
+      {
+          dpp::command_option(dpp::co_string, "status", "Filter series by status", false)
+              .add_choice(dpp::command_option_choice("Active", std::string("active")))
+              .add_choice(dpp::command_option_choice("Completed", std::string("completed")))
+              .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))
+              .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus"))),
+      }};
+
+  m_commands["list-chapters"] = {
+      "List chapters with task completion stats",
+      [this](const dpp::slashcommand_t &e) { Commands::listChapters(*this, e); },
+      {
+          dpp::command_option(dpp::co_string, "series", "Filter by series", false).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "status", "Filter by chapter status", false)
+              .add_choice(dpp::command_option_choice("In Progress", std::string("in_progress")))
+              .add_choice(dpp::command_option_choice("Released", std::string("released")))
+              .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))
+              .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus"))),
+          dpp::command_option(dpp::co_string, "sort", "Sort order", false)
+              .add_choice(dpp::command_option_choice("Chapter number (default)", std::string("number")))
+              .add_choice(dpp::command_option_choice("Chronological", std::string("chronological"))),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::listChaptersAutocomplete(*this, key, input, e);
+      }};
 }
 
 void Bot::fillTriggerList() {
@@ -369,6 +401,56 @@ Bot::Bot(ConfigManager &cfg)
       }
     }
   });
+
+  m_core.on_message_reaction_add([this](const dpp::message_reaction_add_t &event) {
+    if(event.reacting_user.id == m_core.me.id) return;
+
+    const dpp::snowflake msg_id = event.message_id;
+    const std::string emoji = event.reacting_emoji.name;
+    const dpp::snowflake user_id = event.reacting_user.id;
+
+    std::string new_content;
+    dpp::snowflake channel_id;
+    std::string token;
+
+    {
+      std::lock_guard<std::mutex> lock(m_pagination_mutex);
+
+      auto it = m_pagination_store.find(msg_id);
+      if(it == m_pagination_store.end()) return;
+
+      auto &state = it->second;
+
+      if(std::chrono::steady_clock::now() > state.expires_at) {
+        m_pagination_store.erase(it);
+        return;
+      }
+
+      if(state.user_id != user_id) return;
+
+      if(emoji == "◀️" || emoji == "◀") {
+        if(state.current_page == 0) return;
+        --state.current_page;
+      } else if(emoji == "▶️" || emoji == "▶") {
+        if(state.current_page + 1 >= state.pages.size()) return;
+        ++state.current_page;
+      } else {
+        return;
+      }
+
+      new_content = state.pages[state.current_page];
+      channel_id = state.channel_id;
+      token = state.interaction_token;
+    }
+
+    m_core.interaction_response_edit(token, dpp::message(new_content));
+    m_core.message_delete_reaction(msg_id, channel_id, user_id, emoji);
+  });
+}
+
+void Bot::registerPagination(dpp::snowflake message_id, PaginationState state) {
+  std::lock_guard<std::mutex> lock(m_pagination_mutex);
+  m_pagination_store[message_id] = std::move(state);
 }
 
 void Bot::start() { m_core.start(dpp::st_wait); }

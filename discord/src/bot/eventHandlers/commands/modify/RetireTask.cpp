@@ -7,6 +7,8 @@
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
+#include "db/repositories/SeriesAssignments.hpp"
+#include "db/repositories/ChapterAssignments.hpp"
 #include "types/Permission.hpp"
 
 // Standard Includes
@@ -26,6 +28,9 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
     DiscordIdentityRepository identity_repo;
     UserRepository user_repo;
     TasksRepository tasks_repo;
+    SeriesAssignmentsRepository series_assignments_repo;
+    ChapterAssignmentsRepository chapter_assignments_repo;
+    
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
@@ -52,6 +57,8 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
+    series_assignments_repo.removeAllByTask(session.wtx(), maybe_task->id);
+    chapter_assignments_repo.removeOutstandingByTask(session.wtx(), maybe_task->id);
     tasks_repo.retire(session.wtx(), maybe_task->id);
     session.commit();
 

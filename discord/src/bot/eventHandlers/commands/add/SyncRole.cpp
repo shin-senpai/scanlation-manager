@@ -29,13 +29,13 @@ void Commands::syncRole(Bot &bot, const dpp::slashcommand_t &event) {
     DiscordIdentityRepository identity_repo;
     UserRepository user_repo;
 
-    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
+    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
     }
 
-    if(user_repo.getPermissionLevel(session.rtx(), *maybe_user_id) < Permission::manager) {
+    if(user_repo.getPermissionLevel(session.wtx(), *maybe_user_id) < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action."));
       return;
     }
@@ -48,7 +48,7 @@ void Commands::syncRole(Bot &bot, const dpp::slashcommand_t &event) {
     RolesRepository roles_repo;
     bool role_created = false;
     int app_role_id;
-    const auto maybe_existing = roles_repo.findByName(session.rtx(), role_name);
+    const auto maybe_existing = roles_repo.findByName(session.wtx(), role_name);
     if(maybe_existing) {
       app_role_id = maybe_existing->id;
     } else {
@@ -84,7 +84,7 @@ void Commands::syncRole(Bot &bot, const dpp::slashcommand_t &event) {
         DiscordIdentityRepository id_repo;
         UserRolesRepository user_roles_repo;
 
-        const auto maybe_app_user_id = id_repo.findUserIdByDiscordId(assign_session.rtx(), member_discord_id);
+        const auto maybe_app_user_id = id_repo.findUserIdByDiscordId(assign_session.wtx(), member_discord_id);
         if(!maybe_app_user_id) {
           ++not_registered;
           continue;

@@ -26,14 +26,14 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
     DiscordIdentityRepository discord_id_repo;
     UserRepository user_repo;
 
-    const auto maybe_user_id = discord_id_repo.findUserIdByDiscordId(session.rtx(), discord_id);
+    const auto maybe_user_id = discord_id_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("User not Found! Please try after running the /register command"));
       return;
     }
     const int64_t user_id = *maybe_user_id;
 
-    Permission permission_level = user_repo.getPermissionLevel(session.rtx(), user_id);
+    Permission permission_level = user_repo.getPermissionLevel(session.wtx(), user_id);
     if(permission_level < Permission::supermanager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action"));
       return;
@@ -69,7 +69,7 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
         DiscordIdentityRepository id_repo;
         UserRepository u_repo;
 
-        if(id_repo.findUserIdByDiscordId(reg_session.rtx(), member_discord_id)) {
+        if(id_repo.findUserIdByDiscordId(reg_session.wtx(), member_discord_id)) {
           ++skipped;
           continue;
         }

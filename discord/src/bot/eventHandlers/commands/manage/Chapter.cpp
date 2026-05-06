@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/GetAutoCompleteContext.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
@@ -28,22 +29,6 @@
 #include <pqxx/pqxx>
 
 namespace {
-
-// Extracts the value of a named (non-focused) option from a subcommand autocomplete event.
-// Used to read already-filled options (e.g. the series name) when completing a later option.
-std::string getAutocompleteContext(const dpp::autocomplete_t &event, const std::string &option_name) {
-  if(event.options.empty() || event.options[0].type != dpp::co_sub_command)
-    return {};
-  for(const auto &opt : event.options[0].options) {
-    if(opt.name == option_name && !opt.focused) {
-      try {
-        return std::get<std::string>(opt.value);
-      } catch(...) {
-      }
-    }
-  }
-  return {};
-}
 
 void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
@@ -352,18 +337,19 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    if(sub == "add")
+    if(sub == "add") {
       doAdd(event, session);
-    else if(sub == "set-status")
+    } else if(sub == "set-status") { {
       doSetStatus(event, session);
-    else if(sub == "assign")
+    } } else if(sub == "assign") {
       doAssign(event, session);
-    else if(sub == "unassign")
+    } else if(sub == "unassign") {
       doUnassign(event, session);
-    else if(sub == "uncomplete")
+    } else if(sub == "uncomplete") {
       doUncomplete(event, session);
-    else if(sub == "remove")
+    } else if(sub == "remove") {
       doRemove(event, session, user_perm);
+}
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("An error occurred. Contact the administrator to resolve this issue."));
@@ -393,7 +379,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
     }
     // Chapter name options — filters based on the already-typed series
     else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter") {
-      const std::string series_ctx = getAutocompleteContext(event, "series");
+      const std::string series_ctx = BotUtils::getAutoCompleteContext(event, "series");
       if(!series_ctx.empty()) {
         SeriesRepository series_repo;
         ChaptersRepository chapters_repo;

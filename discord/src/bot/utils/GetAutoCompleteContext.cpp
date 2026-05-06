@@ -1,0 +1,25 @@
+// Associated Header Include
+#include "bot/utils/GetAutoCompleteContext.hpp"
+
+// User Defined Includes
+
+// Standard Includes
+#include <string>
+
+// Third Party Includes
+#include <dpp/dispatcher.h>
+
+std::string BotUtils::getAutoCompleteContext(const dpp::autocomplete_t &event, const std::string &option_name) {
+  if(event.options.empty() || event.options[0].type != dpp::co_sub_command) {
+    return {};
+  }
+  for(const auto &opt : event.options[0].options) {
+    if(opt.name == option_name && !opt.focused) {
+      try {
+        return std::get<std::string>(opt.value);
+      } catch(...) {
+      }
+    }
+  }
+  return {};
+}

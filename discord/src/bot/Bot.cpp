@@ -39,15 +39,15 @@
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
 #include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/modify/RetireTask.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
+#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 #include "bot/eventHandlers/commands/modify/SetAlias.hpp"
 #include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
-#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
-#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -166,7 +166,10 @@ void Bot::fillCommandMap() {
       [this](const dpp::slashcommand_t &e) { Commands::assignRole(*this, e); },
       {
           dpp::command_option(dpp::co_user, "user", "The user to assign the role to", true),
-          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true).set_auto_complete(true),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::assignRoleAutocomplete(*this, key, input, e);
       }};
 
   m_commands["remove-role"] = {
@@ -174,28 +177,43 @@ void Bot::fillCommandMap() {
       [this](const dpp::slashcommand_t &e) { Commands::removeRole(*this, e); },
       {
           dpp::command_option(dpp::co_user, "user", "The user to remove the role from", true),
-          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true).set_auto_complete(true),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::removeRoleAutocomplete(*this, key, input, e);
       }};
 
   m_commands["delete-role"] = {
       "Delete a role and all its mappings",
       [this](const dpp::slashcommand_t &e) { Commands::deleteRole(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the role to delete", true)}};
+      {dpp::command_option(dpp::co_string, "name", "Name of the role to delete", true).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::deleteRoleAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["delete-task"] = {
       "Delete a task and all its mappings",
       [this](const dpp::slashcommand_t &e) { Commands::deleteTask(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the task to delete", true)}};
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to delete", true).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::deleteTaskAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["retire-task"] = {
       "Retire a task, preserving its completion history",
       [this](const dpp::slashcommand_t &e) { Commands::retireTask(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the task to retire", true)}};
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to retire", true).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::retireTaskAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["unretire-task"] = {
       "Restore a retired task to active status",
       [this](const dpp::slashcommand_t &e) { Commands::unretireTask(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the task to unretire", true)}};
+      {dpp::command_option(dpp::co_string, "name", "Name of the task to unretire", true).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::unretireTaskAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["list-roles"] = {
       "List all roles",
@@ -209,16 +227,22 @@ void Bot::fillCommandMap() {
       "Unmap a role-task mapping",
       [this](const dpp::slashcommand_t &e) { Commands::unmapRoleTask(*this, e); },
       {
-          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
-          dpp::command_option(dpp::co_string, "task", "Name of the task", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "task", "Name of the task", true).set_auto_complete(true),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::unmapRoleTaskAutocomplete(*this, key, input, e);
       }};
 
   m_commands["map-role-task"] = {
       "Map a role to a task it is responsible for",
       [this](const dpp::slashcommand_t &e) { Commands::mapRoleTask(*this, e); },
       {
-          dpp::command_option(dpp::co_string, "role", "Name of the role", true),
-          dpp::command_option(dpp::co_string, "task", "Name of the task", true),
+          dpp::command_option(dpp::co_string, "role", "Name of the role", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "task", "Name of the task", true).set_auto_complete(true),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::mapRoleTaskAutocomplete(*this, key, input, e);
       }};
 
   m_commands["list-role-tasks"] = {

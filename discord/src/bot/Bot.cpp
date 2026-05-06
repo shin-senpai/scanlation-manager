@@ -68,14 +68,16 @@ void Bot::fillCommandMap() {
       {dpp::command_option(dpp::co_role, "role", "Staff Roles", true)}};
 
   m_commands["work-update"] = {
-      "Update your progress on a Chapter",
-      [this](const dpp::slashcommand_t &e) { Commands::workProgress(e); },
+      "Mark your progress on a chapter task as complete",
+      [this](const dpp::slashcommand_t &e) { Commands::workProgress(*this, e); },
       {
-          dpp::command_option(dpp::co_string, "series", "Choose Series", true).set_auto_complete(true),
-          dpp::command_option(dpp::co_string, "chapter", "Choose Chapter", true).set_auto_complete(true),
-          dpp::command_option(dpp::co_string, "task", "Choose Task", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true),
+          dpp::command_option(dpp::co_string, "task", "Task to mark complete", true).set_auto_complete(true),
       },
-      [this](const std::string &option_name, const std::string &input, const dpp::autocomplete_t &e) { Commands::workProgressAutocomplete(*this, option_name, input, e); }};
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::workProgressAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["register"] = {
       "Register yourself as a scanlation team member",

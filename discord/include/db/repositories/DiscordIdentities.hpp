@@ -15,5 +15,7 @@ public:
 
   std::optional<int> findUserIdByDiscordId(pqxx::transaction_base &txn, int64_t discord_id);
 
+  std::optional<int64_t> findDiscordIdByUserId(pqxx::transaction_base &txn, int user_id);
+
   void unlink(pqxx::transaction_base &txn, int64_t discord_id);
 };

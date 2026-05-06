@@ -18,6 +18,17 @@ std::optional<int> DiscordIdentityRepository::findUserIdByDiscordId(pqxx::transa
   return result[0][0].as<int>();
 }
 
+std::optional<int64_t> DiscordIdentityRepository::findDiscordIdByUserId(pqxx::transaction_base &txn, int user_id) {
+  auto result = txn.exec(
+      "SELECT discord_id FROM discord_identities WHERE user_id = $1 AND unlinked_at IS NULL",
+      pqxx::params{txn, user_id});
+
+  if(result.empty())
+    return std::nullopt;
+
+  return result[0][0].as<int64_t>();
+}
+
 void DiscordIdentityRepository::unlink(pqxx::transaction_base &txn, int64_t discord_id) {
   txn.exec(
       "UPDATE discord_identities SET unlinked_at = NOW() WHERE discord_id = $1 AND unlinked_at IS NULL",

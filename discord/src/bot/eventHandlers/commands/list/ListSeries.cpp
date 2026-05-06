@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/DateUtils.hpp"
 #include "bot/utils/ListUtils.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
@@ -75,7 +76,7 @@ void Commands::listSeries(Bot &bot, const dpp::slashcommand_t &event) {
     std::vector<std::string> lines;
     lines.reserve(series_list.size());
     for(const auto &s : series_list) {
-      const std::string date = s.latest_chapter_at ? *s.latest_chapter_at : "—";
+      const std::string date = s.latest_chapter_at ? BotUtils::toDiscordTimestamp(*s.latest_chapter_at) : "—";
       lines.push_back(
           "- **" + s.name + "** (" + seriesStatusToString(s.status) + ") — " +
           std::to_string(s.chapter_count) + " ch | " + label + ": " + date);

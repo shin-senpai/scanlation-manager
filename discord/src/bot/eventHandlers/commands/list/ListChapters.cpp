@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/DateUtils.hpp"
 #include "bot/utils/ListUtils.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/Chapters.hpp"
@@ -82,8 +83,7 @@ void Commands::listChapters(Bot &bot, const dpp::slashcommand_t &event) {
     std::vector<std::string> lines;
     lines.reserve(chapter_list.size());
     for(const auto &c : chapter_list) {
-      // Date: prefer closed_at (already YYYY-MM-DD), fall back to first 10 chars of added_at
-      const std::string date = c.closed_at ? *c.closed_at : c.added_at.substr(0, 10);
+      const std::string date = BotUtils::toDiscordTimestamp(c.closed_at ? *c.closed_at : c.added_at);
       const std::string task_str = std::to_string(c.completed_tasks) + "/" + std::to_string(c.total_tasks) + " tasks";
       const std::string status_str = chapterStatusToString(c.status);
 

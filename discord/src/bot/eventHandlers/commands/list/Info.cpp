@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/DateUtils.hpp"
 #include "bot/utils/GetAutoCompleteContext.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
@@ -60,9 +61,9 @@ void doSeriesInfo(const dpp::slashcommand_t &event, DbSession &session) {
 
   // Header
   out += "**" + series.name + "** (" + seriesStatusToString(series.status) + ")\n";
-  out += "Added: " + series.added_at.substr(0, 10);
+  out += "Added: " + BotUtils::toDiscordTimestamp(series.added_at);
   if(series.closed_at) {
-    out += " | Closed: " + series.closed_at->substr(0, 10);
+    out += " | Closed: " + BotUtils::toDiscordTimestamp(*series.closed_at);
   }
   out += "\n";
 
@@ -146,9 +147,9 @@ void doChapterInfo(const dpp::slashcommand_t &event, DbSession &session) {
   }
   meta += "Ch." + fmtChapterNumber(ch.number) + " · " + chapterStatusToString(ch.status);
   out += meta + "\n";
-  out += "Added: " + ch.added_at.substr(0, 10);
+  out += "Added: " + BotUtils::toDiscordTimestamp(ch.added_at);
   if(ch.closed_at) {
-    out += " | Closed: " + *ch.closed_at;
+    out += " | Closed: " + BotUtils::toDiscordTimestamp(*ch.closed_at);
   }
   out += "\n";
 
@@ -165,7 +166,7 @@ void doChapterInfo(const dpp::slashcommand_t &event, DbSession &session) {
       }
       out += "  - " + a.user_display;
       if(a.completed_at) {
-        out += " ✅ " + *a.completed_at;
+        out += " ✅ " + BotUtils::toDiscordTimestamp(*a.completed_at);
       } else {
         out += " ⬜";
       }

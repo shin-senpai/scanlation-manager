@@ -38,6 +38,8 @@
 #include "bot/eventHandlers/commands/manage/Chapter.hpp"
 #include "bot/eventHandlers/commands/manage/Series.hpp"
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
+#include "bot/eventHandlers/commands/modify/Demote.hpp"
+#include "bot/eventHandlers/commands/modify/Promote.hpp"
 #include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
 #include "bot/eventHandlers/commands/modify/RetireTask.hpp"
 #include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
@@ -166,6 +168,16 @@ void Bot::fillCommandMap() {
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::chapterAutocomplete(*this, key, input, e);
       }};
+
+  m_commands["promote"] = {
+      "Promote a user to the next permission level (Supermanager only)",
+      [this](const dpp::slashcommand_t &e) { Commands::promote(*this, e); },
+      {dpp::command_option(dpp::co_user, "user", "User to promote", true)}};
+
+  m_commands["demote"] = {
+      "Demote a user to the previous permission level (Supermanager only)",
+      [this](const dpp::slashcommand_t &e) { Commands::demote(*this, e); },
+      {dpp::command_option(dpp::co_user, "user", "User to demote", true)}};
 
   m_commands["assign-role"] = {
       "Assign a role to a user",

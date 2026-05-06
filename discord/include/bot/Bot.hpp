@@ -63,6 +63,7 @@ public:
   dpp::cluster &getCore();
   const dpp::cluster &getCore() const;
   ConnectionPool &getPool();
+  dpp::snowflake getStaffRole();
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
   void setStaffRole(dpp::snowflake role_id);

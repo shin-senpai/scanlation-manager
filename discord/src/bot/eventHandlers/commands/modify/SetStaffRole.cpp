@@ -9,7 +9,10 @@
 #include "types/Permission.hpp"
 
 // Standard Includes
+#include <algorithm>
 #include <exception>
+#include <iostream>
+#include <string>
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
@@ -37,8 +40,54 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
     }
 
     dpp::snowflake role_id = std::get<dpp::snowflake>(event.get_parameter("role"));
+    if(role_id == bot.getStaffRole()) {
+      event.edit_original_response(dpp::message("That Role has already been set as the Staff Role"));
+      return;
+    }
     bot.setStaffRole(role_id);
-    event.edit_original_response(dpp::message("Staff Role updated!"));
+
+    dpp::guild *guild = dpp::find_guild(event.command.guild_id);
+    if(!guild || guild->members.empty()) {
+      event.edit_original_response(dpp::message("Staff Role updated, but guild members are not in cache — auto-registration skipped."));
+      return;
+    }
+
+    int registered = 0;
+    int skipped = 0;
+
+    for(const auto &[_, member] : guild->members) {
+      const auto &roles = member.get_roles();
+      if(std::find(roles.begin(), roles.end(), role_id) == roles.end()) continue;
+
+      dpp::user *u = member.get_user();
+      if(!u || u->is_bot()) continue;
+
+      const int64_t member_discord_id = static_cast<int64_t>(member.user_id);
+
+      try {
+        DbSession reg_session(bot.getPool());
+        DiscordIdentityRepository id_repo;
+        UserRepository u_repo;
+
+        if(id_repo.findUserIdByDiscordId(reg_session.rtx(), member_discord_id)) {
+          ++skipped;
+          continue;
+        }
+
+        const int new_user_id = u_repo.create(reg_session.wtx(), u->username);
+        id_repo.create(reg_session.wtx(), member_discord_id, new_user_id);
+        reg_session.commit();
+        ++registered;
+      } catch(const std::exception &e) {
+        std::cerr << "Auto-register failed for member (" << member_discord_id << "): " << e.what() << std::endl;
+      }
+    }
+
+    std::string msg = "Staff Role updated! Auto-registered " + std::to_string(registered) + " member(s)";
+    if(skipped > 0) msg += " (" + std::to_string(skipped) + " already registered)";
+    msg += ".";
+    event.edit_original_response(dpp::message(msg));
+
   } catch(std::exception &e) {
     event.edit_original_response(dpp::message("Failed to set Staff Role. Contact the administrator to resolve this issue"));
     std::cerr << "Staff Role was failed to be set by user (" << discord_id << ") due to exception: " << e.what() << std::endl;

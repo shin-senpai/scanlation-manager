@@ -25,6 +25,7 @@
 
 // Commands
 #include "bot/eventHandlers/commands/add/AddRole.hpp"
+#include "bot/eventHandlers/commands/add/SyncRole.hpp"
 #include "bot/eventHandlers/commands/list/Info.hpp"
 #include "bot/eventHandlers/commands/list/ListChapters.hpp"
 #include "bot/eventHandlers/commands/list/ListSeries.hpp"
@@ -87,6 +88,11 @@ void Bot::fillCommandMap() {
       "Create a new scanlation role",
       [this](const dpp::slashcommand_t &e) { Commands::addRole(*this, e); },
       {dpp::command_option(dpp::co_string, "name", "Name of the role", true)}};
+
+  m_commands["sync-role"] = {
+      "Create an app role from a Discord role and assign it to all registered members who have it",
+      [this](const dpp::slashcommand_t &e) { Commands::syncRole(*this, e); },
+      {dpp::command_option(dpp::co_role, "role", "Discord role to sync", true)}};
 
   m_commands["add-task"] = {
       "Create a new task type",
@@ -346,8 +352,12 @@ ConnectionPool &Bot::getPool() {
   return m_pool;
 }
 
+dpp::snowflake Bot::getStaffRole() {
+  return m_staff_role_id;
+}
+
 Bot::Bot(ConfigManager &cfg)
-    : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content),
+    : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content | dpp::i_guild_members),
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_staff_role_id(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("staff_role_id"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),

@@ -44,6 +44,7 @@ scanlation-manager/
 | ✅ | `/chapter` — Manage chapters: add, set-status, assign/unassign/uncomplete/remove |
 | ✅ | `/list-series` — List series with chapter counts and latest activity, optional status filter |
 | ✅ | `/list-chapters` — List chapters with task completion stats, optional series/status/sort |
+| ✅ | `/info` — Deep-dive view for a single series (crew + chapters) or chapter (assignments) |
 | ✅ | Work progress message trigger — Parses and echoes structured progress updates |
 | 🚧 | `/work-update` — Slash command to submit a work progress update (autocomplete hardcoded) |
 | 🚧 | Google Sheets integration — Sync progress data to a spreadsheet |
@@ -257,6 +258,12 @@ Lists chapters with task completion progress (`X/Y tasks`). Manager+.
 - **`sort`** — `number` (default, ascending by chapter number) or `chronological` (`closed_at DESC NULLS LAST`).
 - When no series filter is applied, each entry is prefixed with the series name.
 - Results are paginated (10 per page) with ◀ ▶ reactions.
+
+### `/info`
+Deep-dive view for a single entity. Manager+. Autocomplete on all name fields.
+
+- **`series [name]`** — Shows series status, default crew grouped by task, and up to 15 chapters with task completion (`X/Y tasks`). A hint is shown when there are more than 15 chapters.
+- **`chapter [series] [chapter]`** — Shows chapter metadata (volume, number, status, dates) and all assignments grouped by task, each marked ✅ (completed date) or ⬜ (outstanding).
 
 ### `/work-update` *(in progress)*
 Allows staff to submit a work update via slash command with autocomplete for series, chapter, and task. Autocomplete options are currently hardcoded placeholders.

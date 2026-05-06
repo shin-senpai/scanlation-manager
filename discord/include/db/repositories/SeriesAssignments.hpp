@@ -1,6 +1,7 @@
 #pragma once
 
 // User Defined Includes
+#include "models/ModelAssignmentDetail.hpp"
 #include "models/ModelSeriesAssignment.hpp"
 
 // Standard Includes
@@ -23,4 +24,6 @@ public:
   std::vector<SeriesAssignment> listBySeries(pqxx::transaction_base &txn, int series_id, std::optional<int> task_id = std::nullopt);
 
   std::vector<SeriesAssignment> listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id = std::nullopt);
+
+  std::vector<CrewDetail> listBySeriesWithDetails(pqxx::transaction_base &txn, int series_id);
 };

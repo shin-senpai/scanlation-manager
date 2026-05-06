@@ -173,6 +173,7 @@ psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 | `/chapter` (add, set-status, assign, unassign, uncomplete, remove) | Done |
 | `/list-series` | Done |
 | `/list-chapters` | Done |
+| `/info` (series, chapter) | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

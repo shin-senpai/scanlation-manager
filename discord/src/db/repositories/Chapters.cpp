@@ -13,7 +13,7 @@ Chapter rowToChapter(const pqxx::row &row) {
       row["added_at"].as<std::string>(),
       row["closed_at"].is_null() ? std::nullopt : std::make_optional(row["closed_at"].as<std::string>())};
 }
-}
+} // namespace
 
 int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name, std::optional<int> volume) {
   auto result = txn.exec(
@@ -67,7 +67,9 @@ std::vector<Chapter> ChaptersRepository::listBySeries(pqxx::transaction_base &tx
     query += " AND status = $2 ORDER BY number";
     results = txn.exec(query, pqxx::params(txn, series_id, chapterStatusToString(std::get<ChapterStatus>(*filter))));
   } else {
-    if(filter) query += std::get<bool>(*filter) ? " AND closed_at IS NOT NULL" : " AND closed_at IS NULL";
+    if(filter) {
+      query += std::get<bool>(*filter) ? " AND closed_at IS NOT NULL" : " AND closed_at IS NULL";
+}
     query += " ORDER BY number";
     results = txn.exec(query, pqxx::params(txn, series_id));
   }
@@ -116,7 +118,15 @@ std::vector<ChapterWithStats> ChaptersRepository::listWithStats(
       " c.added_at, TO_CHAR(c.closed_at, 'YYYY-MM-DD') AS closed_at,"
       " s.name AS series_name,"
       " COUNT(DISTINCT ca.task_id) AS total_tasks,"
-      " COUNT(DISTINCT CASE WHEN ca.completed_at IS NOT NULL THEN ca.task_id END) AS completed_tasks"
+      " COUNT(DISTINCT ca.task_id) FILTER ("
+      "   WHERE NOT EXISTS ("
+      "     SELECT 1"
+      "     FROM chapter_assignments ca2"
+      "     WHERE ca2.chapter_id = c.id"
+      "       AND ca2.task_id = ca.task_id"
+      "       AND ca2.completed_at IS NULL"
+      "   )"
+      " ) AS completed_tasks"
       " FROM chapters c"
       " JOIN series s ON s.id = c.series_id"
       " LEFT JOIN chapter_assignments ca ON ca.chapter_id = c.id" +
@@ -155,4 +165,3 @@ std::vector<ChapterWithStats> ChaptersRepository::listWithStats(
 
   return chapters;
 }
-

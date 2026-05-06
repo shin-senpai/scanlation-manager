@@ -119,3 +119,26 @@ void ChapterAssignmentsRepository::clearCompleted(pqxx::transaction_base &txn, i
       "UPDATE chapter_assignments SET completed_at = NULL WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3",
       pqxx::params(txn, user_id, chapter_id, task_id));
 }
+
+std::vector<AssignmentDetail> ChapterAssignmentsRepository::listByChapterWithDetails(pqxx::transaction_base &txn, int chapter_id) {
+  auto results = txn.exec(
+      "SELECT t.name AS task_name, u.display_name AS user_display,"
+      " TO_CHAR(ca.completed_at, 'YYYY-MM-DD') AS completed_at"
+      " FROM chapter_assignments ca"
+      " JOIN tasks t ON t.id = ca.task_id"
+      " JOIN users u ON u.id = ca.user_id"
+      " WHERE ca.chapter_id = $1"
+      " ORDER BY t.name ASC, u.display_name ASC",
+      pqxx::params(txn, chapter_id));
+
+  std::vector<AssignmentDetail> assignments;
+  assignments.reserve(results.size());
+  for(const auto &row : results) {
+    assignments.emplace_back(AssignmentDetail{
+        row["task_name"].as<std::string>(),
+        row["user_display"].as<std::string>(),
+        row["completed_at"].is_null() ? std::nullopt : std::make_optional(row["completed_at"].as<std::string>())});
+  }
+
+  return assignments;
+}

@@ -64,3 +64,22 @@ std::vector<SeriesAssignment> SeriesAssignmentsRepository::listByUser(pqxx::tran
 
   return assignments;
 }
+
+std::vector<CrewDetail> SeriesAssignmentsRepository::listBySeriesWithDetails(pqxx::transaction_base &txn, int series_id) {
+  auto results = txn.exec(
+      "SELECT t.name AS task_name, u.display_name AS user_display"
+      " FROM series_assignments sa"
+      " JOIN tasks t ON t.id = sa.task_id"
+      " JOIN users u ON u.id = sa.user_id"
+      " WHERE sa.series_id = $1"
+      " ORDER BY t.name ASC, u.display_name ASC",
+      pqxx::params(txn, series_id));
+
+  std::vector<CrewDetail> crew;
+  crew.reserve(results.size());
+  for(const auto &row : results) {
+    crew.emplace_back(CrewDetail{row["task_name"].as<std::string>(), row["user_display"].as<std::string>()});
+  }
+
+  return crew;
+}

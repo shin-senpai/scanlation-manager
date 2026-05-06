@@ -1,6 +1,7 @@
 #pragma once
 
 // User Defined Includes
+#include "models/ModelAssignmentDetail.hpp"
 #include "models/ModelChapterAssignment.hpp"
 
 // Standard Includes
@@ -39,4 +40,6 @@ public:
   void setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
 
   void clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
+
+  std::vector<AssignmentDetail> listByChapterWithDetails(pqxx::transaction_base &txn, int chapter_id);
 };

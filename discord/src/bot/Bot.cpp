@@ -25,6 +25,7 @@
 
 // Commands
 #include "bot/eventHandlers/commands/add/AddRole.hpp"
+#include "bot/eventHandlers/commands/list/Info.hpp"
 #include "bot/eventHandlers/commands/list/ListChapters.hpp"
 #include "bot/eventHandlers/commands/list/ListSeries.hpp"
 #include "bot/eventHandlers/commands/add/AddTask.hpp"
@@ -233,6 +234,20 @@ void Bot::fillCommandMap() {
               .add_choice(dpp::command_option_choice("Completed", std::string("completed")))
               .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))
               .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus"))),
+      }};
+
+  m_commands["info"] = {
+      "Get detailed info about a series or chapter",
+      [this](const dpp::slashcommand_t &e) { Commands::info(*this, e); },
+      {
+          dpp::command_option(dpp::co_sub_command, "series", "Show full details for a series")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "chapter", "Show full details for a chapter")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true)),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::infoAutocomplete(*this, key, input, e);
       }};
 
   m_commands["list-chapters"] = {

@@ -8,7 +8,7 @@ Task rowToTask(const pqxx::row &row) {
       row["name"].as<std::string>(),
       row["retired_at"].is_null() ? std::nullopt : std::make_optional(row["retired_at"].as<std::string>())};
 }
-}
+} // namespace
 
 int TasksRepository::create(pqxx::transaction_base &txn, std::string_view name) {
   auto result = txn.exec(
@@ -62,7 +62,9 @@ std::optional<Task> TasksRepository::findByName(pqxx::transaction_base &txn, std
 
 std::vector<Task> TasksRepository::listAll(pqxx::transaction_base &txn, bool include_retired) {
   std::string query = "SELECT id, name, retired_at FROM tasks";
-  if(!include_retired) query += " WHERE retired_at IS NULL";
+  if(!include_retired) {
+    query += " WHERE retired_at IS NULL";
+}
   query += " ORDER BY name";
 
   auto results = txn.exec(query);

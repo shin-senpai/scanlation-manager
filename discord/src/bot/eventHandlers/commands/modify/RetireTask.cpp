@@ -31,7 +31,6 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
     TasksRepository tasks_repo;
     SeriesAssignmentsRepository series_assignments_repo;
     ChapterAssignmentsRepository chapter_assignments_repo;
-    
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {

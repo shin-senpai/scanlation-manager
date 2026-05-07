@@ -17,7 +17,7 @@ bool RoleTasksRepository::exists(pqxx::transaction_base &txn, int role_id, int t
   auto results = txn.exec(
       "SELECT 1 FROM role_tasks WHERE role_id = $1 AND task_id = $2 LIMIT 1",
       pqxx::params(txn, role_id, task_id));
-  
+
   return !results.empty();
 }
 

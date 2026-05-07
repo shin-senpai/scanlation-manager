@@ -20,9 +20,12 @@
 namespace {
 std::string permissionName(Permission p) {
   switch(p) {
-    case Permission::standard: return "Standard";
-    case Permission::manager: return "Manager";
-    case Permission::supermanager: return "Supermanager";
+    case Permission::standard:
+      return "Standard";
+    case Permission::manager:
+      return "Manager";
+    case Permission::supermanager:
+      return "Supermanager";
   }
   return "";
 }

@@ -66,8 +66,9 @@ void Triggers::workProgress(const dpp::message_create_t &event) {
         break;
     }
 
-    if(end == std::string_view::npos)
+    if(end == std::string_view::npos) {
       break;
+}
 
     start = end + 1;
   }

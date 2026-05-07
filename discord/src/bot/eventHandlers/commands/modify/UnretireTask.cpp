@@ -75,7 +75,9 @@ void Commands::unretireTaskAutocomplete(Bot &bot, const std::string &key, const 
     if(key == "name") {
       TasksRepository tasks_repo;
       for(const auto &t : tasks_repo.listAll(session.rtx(), true)) {
-        if(!t.retired_at) continue;
+        if(!t.retired_at) {
+          continue;
+}
         if(lower_input.empty() || to_lower(t.name).find(lower_input) != std::string::npos) {
           r.add_autocomplete_choice(dpp::command_option_choice(t.name, t.name));
         }

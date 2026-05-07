@@ -339,9 +339,11 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
 
     if(sub == "add") {
       doAdd(event, session);
-    } else if(sub == "set-status") { {
-      doSetStatus(event, session);
-    } } else if(sub == "assign") {
+    } else if(sub == "set-status") {
+      {
+        doSetStatus(event, session);
+      }
+    } else if(sub == "assign") {
       doAssign(event, session);
     } else if(sub == "unassign") {
       doUnassign(event, session);
@@ -349,7 +351,7 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       doUncomplete(event, session);
     } else if(sub == "remove") {
       doRemove(event, session, user_perm);
-}
+    }
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("An error occurred. Contact the administrator to resolve this issue."));

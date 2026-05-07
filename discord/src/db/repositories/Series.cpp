@@ -54,8 +54,9 @@ std::vector<Series> SeriesRepository::list(pqxx::transaction_base &txn, std::opt
     query += " WHERE status = $1";
     results = txn.exec(query, pqxx::params(txn, seriesStatusToString(std::get<SeriesStatus>(*filter))));
   } else {
-    if(filter)
+    if(filter) {
       query += std::get<bool>(*filter) ? " WHERE closed_at IS NOT NULL" : " WHERE closed_at IS NULL";
+}
     results = txn.exec(query);
   }
 

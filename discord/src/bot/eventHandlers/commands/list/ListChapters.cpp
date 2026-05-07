@@ -117,7 +117,7 @@ void Commands::listChapters(Bot &bot, const dpp::slashcommand_t &event) {
     event.edit_original_response(
         dpp::message(pages[0]),
         [&bot, pages = std::move(pages), token, user_id, chan_id](const dpp::confirmation_callback_t &cb) {
-          if(cb.is_error()){
+          if(cb.is_error()) {
             return;
           }
           const auto &msg = cb.get<dpp::message>();

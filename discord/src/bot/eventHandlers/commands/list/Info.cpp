@@ -75,7 +75,9 @@ void doSeriesInfo(const dpp::slashcommand_t &event, DbSession &session) {
     std::string cur_task;
     for(const auto &c : crew) {
       if(c.task_name != cur_task) {
-        if(!cur_task.empty()) out += "\n";
+        if(!cur_task.empty()) {
+          out += "\n";
+}
         out += "- " + c.task_name + ": ";
         cur_task = c.task_name;
       } else {

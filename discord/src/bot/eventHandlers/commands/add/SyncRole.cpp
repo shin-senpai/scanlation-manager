@@ -72,10 +72,14 @@ void Commands::syncRole(Bot &bot, const dpp::slashcommand_t &event) {
 
     for(const auto &[_, member] : guild->members) {
       const auto &roles = member.get_roles();
-      if(std::find(roles.begin(), roles.end(), discord_role_id) == roles.end()) continue;
+      if(std::find(roles.begin(), roles.end(), discord_role_id) == roles.end()) {
+        continue;
+}
 
       dpp::user *u = member.get_user();
-      if(!u || u->is_bot()) continue;
+      if(!u || u->is_bot()) {
+        continue;
+}
 
       const int64_t member_discord_id = static_cast<int64_t>(member.user_id);
 
@@ -101,10 +105,13 @@ void Commands::syncRole(Bot &bot, const dpp::slashcommand_t &event) {
     }
 
     const std::string role_msg = role_created ? "Created" : "Found existing";
-    std::string msg = role_msg + " app role **" + role_name + "**. "
-        + "Assigned to " + std::to_string(assigned) + " user(s)";
-    if(already_had > 0) msg += ", " + std::to_string(already_had) + " already had it";
-    if(not_registered > 0) msg += ", " + std::to_string(not_registered) + " not registered";
+    std::string msg = role_msg + " app role **" + role_name + "**. " + "Assigned to " + std::to_string(assigned) + " user(s)";
+    if(already_had > 0) {
+      msg += ", " + std::to_string(already_had) + " already had it";
+}
+    if(not_registered > 0) {
+      msg += ", " + std::to_string(not_registered) + " not registered";
+}
     msg += ".";
     event.edit_original_response(dpp::message(msg));
 

@@ -71,8 +71,9 @@ std::optional<std::string> TaskDependenciesRepository::findFirstBlockingDependen
       " WHERE td.task_id = $1 AND ca.chapter_id = $2 AND ca.completed_at IS NULL"
       " LIMIT 1",
       pqxx::params(txn, task_id, chapter_id));
-  if(result.empty())
+  if(result.empty()) {
     return std::nullopt;
+}
   return result[0][0].as<std::string>();
 }
 
@@ -88,7 +89,8 @@ std::vector<std::pair<int64_t, std::string>> TaskDependenciesRepository::findDep
       pqxx::params(txn, depends_on_task_id, chapter_id));
   std::vector<std::pair<int64_t, std::string>> assignees;
   assignees.reserve(result.size());
-  for(const auto &row : result)
+  for(const auto &row : result) {
     assignees.emplace_back(row[0].as<int64_t>(), row[1].as<std::string>());
+}
   return assignees;
 }

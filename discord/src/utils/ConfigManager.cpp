@@ -25,11 +25,11 @@ void ConfigManager::load() {
   std::lock_guard<std::mutex> lock(m_mtx);
   std::ifstream f(m_path);
 
-  if (!f.is_open()) {
+  if(!f.is_open()) {
     throw std::runtime_error("Failed to open config file: " + m_path);
   }
 
-  if (f.peek() == std::ifstream::traits_type::eof()) {
+  if(f.peek() == std::ifstream::traits_type::eof()) {
     throw std::runtime_error("Config file is empty: " + m_path);
   }
 

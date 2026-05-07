@@ -9,8 +9,8 @@
 #include "db/repositories/Chapters.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/Series.hpp"
-#include "db/repositories/Tasks.hpp"
 #include "db/repositories/TaskDependencies.hpp"
+#include "db/repositories/Tasks.hpp"
 
 // Standard Includes
 #include <algorithm>
@@ -73,7 +73,7 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
       event.edit_original_response(dpp::message("You have already completed **" + task_name + "** for **" + chapter_name + "**."));
       return;
     }
-    
+
     if(task_deps_repo.findFirstBlockingDependency(session.rtx(), maybe_chapter->id, maybe_task->id)) {
       event.edit_original_response(dpp::message(
           "Cannot complete **" + task_name + "**: still has incomplete dependencies.**"));
@@ -124,7 +124,7 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
       }
     } else if(key == "chapter") {
       const std::string series_name = BotUtils::getAutoCompleteContext(event, "series");
-      
+
       if(!series_name.empty()) {
         SeriesRepository series_repo;
         ChaptersRepository chapters_repo;
@@ -154,9 +154,13 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
           const auto maybe_chapter = chapters_repo.findByName(session.rtx(), maybe_series->id, chapter_name);
           if(maybe_chapter) {
             for(const auto &a : assignments_repo.listByChapter(session.rtx(), maybe_chapter->id, std::nullopt, false)) {
-              if(a.user_id != static_cast<int>(*maybe_user_id)) continue;
+              if(a.user_id != static_cast<int>(*maybe_user_id)) {
+                continue;
+}
               const auto maybe_task = tasks_repo.findById(session.rtx(), a.task_id);
-              if(!maybe_task) continue;
+              if(!maybe_task) {
+                continue;
+}
               if(lower_input.empty() || to_lower(maybe_task->name).find(lower_input) != std::string::npos) {
                 r.add_autocomplete_choice(dpp::command_option_choice(maybe_task->name, maybe_task->name));
               }

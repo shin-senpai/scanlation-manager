@@ -25,33 +25,33 @@
 
 // Commands
 #include "bot/eventHandlers/commands/add/AddRole.hpp"
+#include "bot/eventHandlers/commands/add/AddTask.hpp"
+#include "bot/eventHandlers/commands/add/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/add/SyncRole.hpp"
 #include "bot/eventHandlers/commands/list/Info.hpp"
 #include "bot/eventHandlers/commands/list/ListChapters.hpp"
-#include "bot/eventHandlers/commands/list/ListSeries.hpp"
-#include "bot/eventHandlers/commands/add/AddTask.hpp"
-#include "bot/eventHandlers/commands/add/RegisterUser.hpp"
 #include "bot/eventHandlers/commands/list/ListRoleTasks.hpp"
 #include "bot/eventHandlers/commands/list/ListRoles.hpp"
+#include "bot/eventHandlers/commands/list/ListSeries.hpp"
 #include "bot/eventHandlers/commands/list/ListTasks.hpp"
 #include "bot/eventHandlers/commands/list/Ping.hpp"
+#include "bot/eventHandlers/commands/list/Todo.hpp"
 #include "bot/eventHandlers/commands/manage/Chapter.hpp"
 #include "bot/eventHandlers/commands/manage/Series.hpp"
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
 #include "bot/eventHandlers/commands/modify/Demote.hpp"
-#include "bot/eventHandlers/commands/modify/Promote.hpp"
 #include "bot/eventHandlers/commands/modify/MapRoleTask.hpp"
+#include "bot/eventHandlers/commands/modify/Promote.hpp"
 #include "bot/eventHandlers/commands/modify/RetireTask.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
-#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
-#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
-#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 #include "bot/eventHandlers/commands/modify/SetAlias.hpp"
 #include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
-#include "bot/eventHandlers/commands/list/Todo.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
+#include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
+#include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
+#include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -333,11 +333,13 @@ static bool hasRole(const std::vector<dpp::snowflake> &roles, dpp::snowflake rol
 
 static bool isAdmin(const dpp::snowflake guild_id, const dpp::snowflake user_id, const std::vector<dpp::snowflake> &roles) {
   dpp::guild *guild = dpp::find_guild(guild_id);
-  if(!guild)
+  if(!guild) {
     return false;
+}
 
-  if(user_id == guild->owner_id)
+  if(user_id == guild->owner_id) {
     return true;
+}
 
   for(const auto &role_id : roles) {
     dpp::role *role = dpp::find_role(role_id);
@@ -462,8 +464,9 @@ Bot::Bot(ConfigManager &cfg)
   });
 
   m_core.on_message_create([this](const dpp::message_create_t &event) {
-    if(event.msg.author.is_bot())
+    if(event.msg.author.is_bot()) {
       return;
+}
 
     for(const auto &trigger : m_triggers) {
       if(trigger.should_trigger(event)) {
@@ -473,7 +476,9 @@ Bot::Bot(ConfigManager &cfg)
   });
 
   m_core.on_message_reaction_add([this](const dpp::message_reaction_add_t &event) {
-    if(event.reacting_user.id == m_core.me.id) return;
+    if(event.reacting_user.id == m_core.me.id) {
+      return;
+}
 
     const dpp::snowflake msg_id = event.message_id;
     const std::string emoji = event.reacting_emoji.name;
@@ -487,7 +492,9 @@ Bot::Bot(ConfigManager &cfg)
       std::lock_guard<std::mutex> lock(m_pagination_mutex);
 
       auto it = m_pagination_store.find(msg_id);
-      if(it == m_pagination_store.end()) return;
+      if(it == m_pagination_store.end()) {
+        return;
+}
 
       auto &state = it->second;
 
@@ -496,13 +503,19 @@ Bot::Bot(ConfigManager &cfg)
         return;
       }
 
-      if(state.user_id != user_id) return;
+      if(state.user_id != user_id) {
+        return;
+}
 
       if(emoji == "◀️" || emoji == "◀") {
-        if(state.current_page == 0) return;
+        if(state.current_page == 0) {
+          return;
+}
         --state.current_page;
       } else if(emoji == "▶️" || emoji == "▶") {
-        if(state.current_page + 1 >= state.pages.size()) return;
+        if(state.current_page + 1 >= state.pages.size()) {
+          return;
+}
         ++state.current_page;
       } else {
         return;

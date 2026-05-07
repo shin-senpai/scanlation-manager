@@ -12,8 +12,9 @@ std::optional<int> DiscordIdentityRepository::findUserIdByDiscordId(pqxx::transa
       "SELECT user_id FROM discord_identities WHERE discord_id = $1 AND unlinked_at IS NULL",
       pqxx::params{txn, discord_id});
 
-  if(result.empty())
+  if(result.empty()) {
     return std::nullopt;
+}
 
   return result[0][0].as<int>();
 }
@@ -23,8 +24,9 @@ std::optional<int64_t> DiscordIdentityRepository::findDiscordIdByUserId(pqxx::tr
       "SELECT discord_id FROM discord_identities WHERE user_id = $1 AND unlinked_at IS NULL",
       pqxx::params{txn, user_id});
 
-  if(result.empty())
+  if(result.empty()) {
     return std::nullopt;
+}
 
   return result[0][0].as<int64_t>();
 }

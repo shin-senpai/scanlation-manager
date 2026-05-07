@@ -57,10 +57,14 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
 
     for(const auto &[_, member] : guild->members) {
       const auto &roles = member.get_roles();
-      if(std::find(roles.begin(), roles.end(), role_id) == roles.end()) continue;
+      if(std::find(roles.begin(), roles.end(), role_id) == roles.end()) {
+        continue;
+}
 
       dpp::user *u = member.get_user();
-      if(!u || u->is_bot()) continue;
+      if(!u || u->is_bot()) {
+        continue;
+}
 
       const int64_t member_discord_id = static_cast<int64_t>(member.user_id);
 
@@ -83,7 +87,9 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
     }
 
     std::string msg = "Staff Role updated! Auto-registered " + std::to_string(registered) + " member(s)";
-    if(skipped > 0) msg += " (" + std::to_string(skipped) + " already registered)";
+    if(skipped > 0) {
+      msg += " (" + std::to_string(skipped) + " already registered)";
+}
     msg += ".";
     event.edit_original_response(dpp::message(msg));
 

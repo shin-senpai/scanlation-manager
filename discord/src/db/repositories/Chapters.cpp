@@ -69,7 +69,7 @@ std::vector<Chapter> ChaptersRepository::listBySeries(pqxx::transaction_base &tx
   } else {
     if(filter) {
       query += std::get<bool>(*filter) ? " AND closed_at IS NOT NULL" : " AND closed_at IS NULL";
-}
+    }
     query += " ORDER BY number";
     results = txn.exec(query, pqxx::params(txn, series_id));
   }
@@ -84,19 +84,24 @@ std::vector<Chapter> ChaptersRepository::listBySeries(pqxx::transaction_base &tx
 }
 
 std::vector<Chapter> ChaptersRepository::listBySeriesIds(pqxx::transaction_base &txn, const std::vector<int> &series_ids) {
-  if(series_ids.empty()) return {};
+  if(series_ids.empty()) {
+    return {};
+}
 
   pqxx::params params(txn);
   std::string placeholders;
   for(size_t i = 0; i < series_ids.size(); ++i) {
-    if(i > 0) placeholders += ",";
+    if(i > 0) {
+      placeholders += ",";
+}
     placeholders += "$" + std::to_string(i + 1);
     params.append(series_ids[i]);
   }
 
   auto results = txn.exec(
       "SELECT id, series_id, volume, number, name, status, added_at, closed_at"
-      " FROM chapters WHERE series_id IN (" + placeholders + ") ORDER BY series_id, number",
+      " FROM chapters WHERE series_id IN (" +
+          placeholders + ") ORDER BY series_id, number",
       params);
 
   std::vector<Chapter> chapters;

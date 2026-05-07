@@ -163,8 +163,9 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
       for(const auto &[cname, tasks] : chapter_tasks) {
         msg += "• **" + cname + "** — ";
         for(size_t i = 0; i < tasks.size(); ++i) {
-          if(i > 0)
+          if(i > 0) {
             msg += ", ";
+}
           msg += tasks[i];
         }
         msg += "\n";

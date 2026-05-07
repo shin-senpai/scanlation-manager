@@ -65,18 +65,17 @@ void Commands::setStaffRole(Bot &bot, const dpp::slashcommand_t &event) {
       const int64_t member_discord_id = static_cast<int64_t>(member.user_id);
 
       try {
-        DbSession reg_session(bot.getPool());
         DiscordIdentityRepository id_repo;
         UserRepository u_repo;
 
-        if(id_repo.findUserIdByDiscordId(reg_session.wtx(), member_discord_id)) {
+        if(id_repo.findUserIdByDiscordId(session.wtx(), member_discord_id)) {
           ++skipped;
           continue;
         }
 
-        const int new_user_id = u_repo.create(reg_session.wtx(), u->username);
-        id_repo.create(reg_session.wtx(), member_discord_id, new_user_id);
-        reg_session.commit();
+        const int new_user_id = u_repo.create(session.wtx(), u->username);
+        id_repo.create(session.wtx(), member_discord_id, new_user_id);
+        session.commit();
         ++registered;
       } catch(const std::exception &e) {
         std::cerr << "Auto-register failed for member (" << member_discord_id << "): " << e.what() << std::endl;

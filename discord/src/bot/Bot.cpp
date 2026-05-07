@@ -81,8 +81,9 @@ void Bot::fillCommandMap() {
       }};
 
   m_commands["register"] = {
-      "Register yourself as a scanlation team member",
-      [this](const dpp::slashcommand_t &e) { Commands::registerUser(*this, e); }};
+      "Register yourself or another user as a scanlation team member",
+      [this](const dpp::slashcommand_t &e) { Commands::registerUser(*this, e); },
+      {dpp::command_option(dpp::co_user, "user", "User to register (manager+ only, defaults to yourself)", false)}};
 
   m_commands["set-alias"] = {
       "Set the alias that you want to use for credit",

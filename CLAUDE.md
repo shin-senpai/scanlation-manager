@@ -158,6 +158,7 @@ psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 | `/set-alias` | Done |
 | `/add-role` | Done |
 | `/add-task` | Done |
+| `/sync-role` | Done |
 | `/assign-role` | Done |
 | `/remove-role` | Done |
 | `/delete-role` | Done |
@@ -174,6 +175,10 @@ psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 | `/list-series` | Done |
 | `/list-chapters` | Done |
 | `/info` (series, chapter) | Done |
+| `/promote` | Done |
+| `/demote` | Done |
+| `/work-update` | Done |
+| `/todo` | Done |
+| `/user-history` | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
-| `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

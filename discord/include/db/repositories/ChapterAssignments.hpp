@@ -3,9 +3,12 @@
 // User Defined Includes
 #include "models/ModelAssignmentDetail.hpp"
 #include "models/ModelChapterAssignment.hpp"
+#include "models/ModelUserHistoryEntry.hpp"
 
 // Standard Includes
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 // Third Party Includes
@@ -46,4 +49,13 @@ public:
   void clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
 
   std::vector<AssignmentDetail> listByChapterWithDetails(pqxx::transaction_base &txn, int chapter_id);
+
+  // Returns (series_id, series_name) for series where user has at least one outstanding assignment.
+  std::vector<std::pair<int, std::string>> listActiveSeriesForUser(pqxx::transaction_base &txn, int user_id);
+
+  // Returns the number of distinct series the user has any assignment in (completed or not).
+  int countTotalSeriesForUser(pqxx::transaction_base &txn, int user_id);
+
+  // Returns all completed assignments for a user, newest first, with full series/chapter/task details.
+  std::vector<UserHistoryEntry> listCompletedByUserWithDetails(pqxx::transaction_base &txn, int user_id, std::optional<int> series_id = std::nullopt);
 };

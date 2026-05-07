@@ -14,7 +14,7 @@ std::optional<int> DiscordIdentityRepository::findUserIdByDiscordId(pqxx::transa
 
   if(result.empty()) {
     return std::nullopt;
-}
+  }
 
   return result[0][0].as<int>();
 }
@@ -26,9 +26,20 @@ std::optional<int64_t> DiscordIdentityRepository::findDiscordIdByUserId(pqxx::tr
 
   if(result.empty()) {
     return std::nullopt;
-}
+  }
 
   return result[0][0].as<int64_t>();
+}
+
+std::optional<DiscordIdentityInfo> DiscordIdentityRepository::findActiveByUserId(pqxx::transaction_base &txn, int user_id) {
+  auto result = txn.exec(
+      "SELECT discord_id, TO_CHAR(linked_at, 'YYYY-MM-DD') FROM discord_identities"
+      " WHERE user_id = $1 AND unlinked_at IS NULL",
+      pqxx::params{txn, user_id});
+  if(result.empty()) {
+    return std::nullopt;
+  }
+  return DiscordIdentityInfo{result[0][0].as<int64_t>(), result[0][1].as<std::string>()};
 }
 
 void DiscordIdentityRepository::unlink(pqxx::transaction_base &txn, int64_t discord_id) {

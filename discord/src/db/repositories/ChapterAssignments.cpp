@@ -1,6 +1,7 @@
 // Associated Header Include
 #include "db/repositories/ChapterAssignments.hpp"
 #include "models/ModelChapterAssignment.hpp"
+#include "models/ModelUserHistoryEntry.hpp"
 #include <string>
 
 static std::vector<ChapterAssignment> buildResults(const pqxx::result &results) {
@@ -198,6 +199,32 @@ void ChapterAssignmentsRepository::clearCompleted(pqxx::transaction_base &txn, i
       pqxx::params(txn, user_id, chapter_id, task_id));
 }
 
+std::vector<std::pair<int, std::string>> ChapterAssignmentsRepository::listActiveSeriesForUser(pqxx::transaction_base &txn, int user_id) {
+  auto results = txn.exec(
+      "SELECT DISTINCT c.series_id, s.name"
+      " FROM chapter_assignments ca"
+      " JOIN chapters c ON c.id = ca.chapter_id"
+      " JOIN series s ON s.id = c.series_id"
+      " WHERE ca.user_id = $1 AND ca.completed_at IS NULL"
+      " ORDER BY s.name",
+      pqxx::params(txn, user_id));
+  std::vector<std::pair<int, std::string>> out;
+  out.reserve(results.size());
+  for(const auto &row : results)
+    out.emplace_back(row[0].as<int>(), row[1].as<std::string>());
+  return out;
+}
+
+int ChapterAssignmentsRepository::countTotalSeriesForUser(pqxx::transaction_base &txn, int user_id) {
+  auto result = txn.exec(
+      "SELECT COUNT(DISTINCT c.series_id)"
+      " FROM chapter_assignments ca"
+      " JOIN chapters c ON c.id = ca.chapter_id"
+      " WHERE ca.user_id = $1",
+      pqxx::params(txn, user_id));
+  return result[0][0].as<int>();
+}
+
 std::vector<AssignmentDetail> ChapterAssignmentsRepository::listByChapterWithDetails(pqxx::transaction_base &txn, int chapter_id) {
   auto results = txn.exec(
       "SELECT t.name AS task_name, u.display_name AS user_display,"
@@ -219,4 +246,38 @@ std::vector<AssignmentDetail> ChapterAssignmentsRepository::listByChapterWithDet
   }
 
   return assignments;
+}
+
+std::vector<UserHistoryEntry> ChapterAssignmentsRepository::listCompletedByUserWithDetails(pqxx::transaction_base &txn, int user_id, std::optional<int> series_id) {
+  std::string query =
+      "SELECT s.name AS series_name, c.volume, c.number AS chapter_number,"
+      " c.name AS chapter_name, t.name AS task_name,"
+      " TO_CHAR(ca.completed_at, 'YYYY-MM-DD') AS completed_at"
+      " FROM chapter_assignments ca"
+      " JOIN chapters c ON c.id = ca.chapter_id"
+      " JOIN series s ON s.id = c.series_id"
+      " JOIN tasks t ON t.id = ca.task_id"
+      " WHERE ca.user_id = $1 AND ca.completed_at IS NOT NULL";
+
+  pqxx::result results;
+  if(series_id) {
+    query += " AND s.id = $2 ORDER BY ca.completed_at DESC";
+    results = txn.exec(query, pqxx::params(txn, user_id, *series_id));
+  } else {
+    query += " ORDER BY ca.completed_at DESC";
+    results = txn.exec(query, pqxx::params(txn, user_id));
+  }
+
+  std::vector<UserHistoryEntry> entries;
+  entries.reserve(results.size());
+  for(const auto &row : results) {
+    entries.emplace_back(UserHistoryEntry{
+        row["series_name"].as<std::string>(),
+        row["volume"].is_null() ? std::nullopt : std::make_optional(row["volume"].as<int>()),
+        row["chapter_number"].as<double>(),
+        row["chapter_name"].as<std::string>(),
+        row["task_name"].as<std::string>(),
+        row["completed_at"].as<std::string>()});
+  }
+  return entries;
 }

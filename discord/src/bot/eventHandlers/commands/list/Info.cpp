@@ -12,6 +12,7 @@
 #include "db/repositories/Series.hpp"
 #include "db/repositories/SeriesAssignments.hpp"
 #include "db/repositories/User.hpp"
+#include "db/repositories/UserAliases.hpp"
 #include "types/ChapterStatus.hpp"
 #include "types/Permission.hpp"
 #include "types/SeriesStatus.hpp"
@@ -77,7 +78,7 @@ void doSeriesInfo(const dpp::slashcommand_t &event, DbSession &session) {
       if(c.task_name != cur_task) {
         if(!cur_task.empty()) {
           out += "\n";
-}
+        }
         out += "- " + c.task_name + ": ";
         cur_task = c.task_name;
       } else {
@@ -179,6 +180,83 @@ void doChapterInfo(const dpp::slashcommand_t &event, DbSession &session) {
   event.edit_original_response(dpp::message(out));
 }
 
+void doUserInfo(const dpp::slashcommand_t &event, DbSession &session, int caller_user_id, Permission caller_permission) {
+  DiscordIdentityRepository identity_repo;
+  UserRepository user_repo;
+  UserAliasesRepository alias_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
+
+  int resolved_user_id;
+  const dpp::snowflake target_snowflake = std::get<dpp::snowflake>(event.get_parameter("user"));
+  if(!target_snowflake.empty()) {
+    if(caller_permission < Permission::manager) {
+      event.edit_original_response(dpp::message("You lack the permission to view other users info."));
+      return;
+    }
+    const auto maybe_target = identity_repo.findUserIdByDiscordId(session.rtx(), static_cast<int64_t>(target_snowflake));
+    if(!maybe_target) {
+      event.edit_original_response(dpp::message("That user is not registered."));
+      return;
+    }
+    resolved_user_id = *maybe_target;
+  } else {
+    resolved_user_id = caller_user_id;
+  }
+
+  const auto maybe_user = user_repo.findById(session.rtx(), resolved_user_id);
+  if(!maybe_user) {
+    event.edit_original_response(dpp::message("User not found."));
+    return;
+  }
+  const auto &u = *maybe_user;
+
+  const auto maybe_alias = alias_repo.read(session.rtx(), resolved_user_id);
+  const auto maybe_identity = identity_repo.findActiveByUserId(session.rtx(), resolved_user_id);
+  const auto active_series = chapter_assignments_repo.listActiveSeriesForUser(session.rtx(), resolved_user_id);
+  const int total_series = chapter_assignments_repo.countTotalSeriesForUser(session.rtx(), resolved_user_id);
+
+  std::string permission_str;
+  switch(u.permission_level) {
+    case Permission::standard:
+      permission_str = "Standard";
+      break;
+    case Permission::manager:
+      permission_str = "Manager";
+      break;
+    case Permission::supermanager:
+      permission_str = "Supermanager";
+      break;
+  }
+
+  std::string out;
+  out += "**" + u.display_name + "**\n";
+  out += "Username: " + (u.name ? "**" + *u.name + "**" : "N/A") + "\n";
+  out += "Alias: " + (maybe_alias ? "**" + *maybe_alias + "**" : "N/A") + "\n";
+  out += "Permission: " + permission_str + "\n";
+  out += "Joined: " + BotUtils::toDiscordTimestamp(u.joined_at) + "\n";
+  if(u.left_at) {
+    out += "Left: " + BotUtils::toDiscordTimestamp(*u.left_at) + "\n";
+  }
+
+  if(maybe_identity) {
+    out += "Discord: <@" + std::to_string(maybe_identity->discord_id) + ">" + " (linked " + BotUtils::toDiscordTimestamp(maybe_identity->linked_at) + ")\n";
+  } else {
+    out += "Discord: N/A\n";
+  }
+
+  out += "\n**Currently Working On (" + std::to_string(active_series.size()) + ")**\n";
+  if(active_series.empty()) {
+    out += "(none)\n";
+  } else {
+    for(const auto &[sid, sname] : active_series) {
+      out += "• " + sname + "\n";
+    }
+  }
+  out += "\n**Total Series Worked On:** " + std::to_string(total_series);
+
+  event.edit_original_response(dpp::message(out));
+}
+
 } // namespace
 
 void Commands::info(Bot &bot, const dpp::slashcommand_t &event) {
@@ -200,16 +278,20 @@ void Commands::info(Bot &bot, const dpp::slashcommand_t &event) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
     }
+    const Permission perm = user_repo.getPermissionLevel(session.rtx(), *maybe_user_id);
 
-    if(user_repo.getPermissionLevel(session.rtx(), *maybe_user_id) < Permission::manager) {
-      event.edit_original_response(dpp::message("You lack the permission to perform this action."));
-      return;
-    }
-
-    if(sub == "series") {
-      doSeriesInfo(event, session);
-    } else if(sub == "chapter") {
-      doChapterInfo(event, session);
+    if(sub == "series" || sub == "chapter") {
+      if(perm < Permission::manager) {
+        event.edit_original_response(dpp::message("You lack the permission to perform this action."));
+        return;
+      }
+      if(sub == "series") {
+        doSeriesInfo(event, session);
+      } else {
+        doChapterInfo(event, session);
+      }
+    } else if(sub == "user") {
+      doUserInfo(event, session, *maybe_user_id, perm);
     }
   } catch(const std::exception &e) {
     std::cerr << "info failed for user (" << discord_id << "): " << e.what() << std::endl;

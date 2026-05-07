@@ -36,6 +36,7 @@
 #include "bot/eventHandlers/commands/list/ListTasks.hpp"
 #include "bot/eventHandlers/commands/list/Ping.hpp"
 #include "bot/eventHandlers/commands/list/Todo.hpp"
+#include "bot/eventHandlers/commands/list/UserHistory.hpp"
 #include "bot/eventHandlers/commands/manage/Chapter.hpp"
 #include "bot/eventHandlers/commands/manage/Series.hpp"
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
@@ -283,7 +284,7 @@ void Bot::fillCommandMap() {
       }};
 
   m_commands["info"] = {
-      "Get detailed info about a series or chapter",
+      "Get detailed info about a series, chapter, or user",
       [this](const dpp::slashcommand_t &e) { Commands::info(*this, e); },
       {
           dpp::command_option(dpp::co_sub_command, "series", "Show full details for a series")
@@ -291,6 +292,8 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_sub_command, "chapter", "Show full details for a chapter")
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "user", "Show profile info for a user")
+              .add_option(dpp::command_option(dpp::co_user, "user", "User to look up (defaults to yourself, manager+ for others)", false)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::infoAutocomplete(*this, key, input, e);
@@ -300,6 +303,17 @@ void Bot::fillCommandMap() {
       "Show your pending tasks (or another user's)",
       [this](const dpp::slashcommand_t &e) { Commands::todo(*this, e); },
       {dpp::command_option(dpp::co_user, "user", "User to check (defaults to yourself)", false)}};
+
+  m_commands["user-history"] = {
+      "View completed assignment history for a user",
+      [this](const dpp::slashcommand_t &e) { Commands::userHistory(*this, e); },
+      {
+          dpp::command_option(dpp::co_user, "user", "User to check (defaults to yourself, manager+ for others)", false),
+          dpp::command_option(dpp::co_string, "series", "Filter by series", false).set_auto_complete(true),
+      },
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::userHistoryAutocomplete(*this, key, input, e);
+      }};
 
   m_commands["list-chapters"] = {
       "List chapters with task completion stats",

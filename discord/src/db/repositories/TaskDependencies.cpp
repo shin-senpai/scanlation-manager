@@ -1,5 +1,6 @@
 // Associated Header Include
 #include "db/repositories/TaskDependencies.hpp"
+#include <map>
 
 void TaskDependenciesRepository::create(pqxx::transaction_base &txn, int task_id, int depends_on_task_id) {
   txn.exec(
@@ -42,6 +43,20 @@ std::vector<TaskDependency> TaskDependenciesRepository::listDependentsOf(pqxx::t
   deps.reserve(results.size());
   for(const auto &row : results) {
     deps.emplace_back(row["task_id"].as<int>(), row["depends_on_task_id"].as<int>());
+  }
+
+  return deps;
+}
+
+std::unordered_map<int, std::vector<int>> TaskDependenciesRepository::listAll(pqxx::transaction_base &txn) {
+  auto results = txn.exec(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies",
+      pqxx::params(txn));
+
+  std::unordered_map<int, std::vector<int>> deps;
+  for(const auto &row : results) {
+    deps[row["task_id"].as<int>()]
+        .push_back(row["depends_on_task_id"].as<int>());
   }
 
   return deps;

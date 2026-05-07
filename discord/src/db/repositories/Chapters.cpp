@@ -83,6 +83,30 @@ std::vector<Chapter> ChaptersRepository::listBySeries(pqxx::transaction_base &tx
   return chapters;
 }
 
+std::vector<Chapter> ChaptersRepository::listBySeriesIds(pqxx::transaction_base &txn, const std::vector<int> &series_ids) {
+  if(series_ids.empty()) return {};
+
+  pqxx::params params(txn);
+  std::string placeholders;
+  for(size_t i = 0; i < series_ids.size(); ++i) {
+    if(i > 0) placeholders += ",";
+    placeholders += "$" + std::to_string(i + 1);
+    params.append(series_ids[i]);
+  }
+
+  auto results = txn.exec(
+      "SELECT id, series_id, volume, number, name, status, added_at, closed_at"
+      " FROM chapters WHERE series_id IN (" + placeholders + ") ORDER BY series_id, number",
+      params);
+
+  std::vector<Chapter> chapters;
+  chapters.reserve(results.size());
+  for(const auto &row : results) {
+    chapters.emplace_back(rowToChapter(row));
+  }
+  return chapters;
+}
+
 void ChaptersRepository::updateStatus(pqxx::transaction_base &txn, int id, ChapterStatus status) {
   txn.exec(
       "UPDATE chapters SET status = $2, closed_at = CASE WHEN $2 IN ('in_progress', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",

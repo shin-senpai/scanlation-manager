@@ -37,6 +37,10 @@ public:
 
   std::vector<ChapterAssignment> listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id = std::nullopt, std::optional<bool> completed = std::nullopt);
 
+  std::vector<ChapterAssignment> listBySeries(pqxx::transaction_base &txn, std::vector<int> series_ids, std::optional<std::vector<int>> chapter_ids = std::nullopt, std::optional<bool> completed = std::nullopt);
+
+  std::vector<int> listDistinctSeriesByUser(pqxx::transaction_base &txn, int user_id, std::optional<bool> completed);
+
   void setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
 
   void clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);

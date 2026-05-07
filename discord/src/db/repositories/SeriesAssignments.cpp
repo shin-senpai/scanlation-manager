@@ -65,6 +65,20 @@ std::vector<SeriesAssignment> SeriesAssignmentsRepository::listByUser(pqxx::tran
   return assignments;
 }
 
+std::vector<int> SeriesAssignmentsRepository::listDistinctSeriesByUser(pqxx::transaction_base &txn, int user_id) {
+  auto results = txn.exec(
+      "SELECT DISTINCT series_id FROM series_assignments WHERE user_id = $1",
+      pqxx::params(txn, user_id));
+
+  std::vector<int> series;
+  series.reserve(results.size());
+  for(const auto &row : results) {
+    series.emplace_back(row["series_id"].as<int>());
+  }
+
+  return series;
+}
+
 std::vector<CrewDetail> SeriesAssignmentsRepository::listBySeriesWithDetails(pqxx::transaction_base &txn, int series_id) {
   auto results = txn.exec(
       "SELECT t.name AS task_name, u.display_name AS user_display"

@@ -26,6 +26,8 @@ public:
 
   std::vector<Chapter> listBySeries(pqxx::transaction_base &txn, int series_id, std::optional<std::variant<ChapterStatus, bool>> filter = std::nullopt);
 
+  std::vector<Chapter> listBySeriesIds(pqxx::transaction_base &txn, const std::vector<int> &series_ids);
+
   std::vector<ChapterWithStats> listWithStats(
       pqxx::transaction_base &txn,
       std::optional<int> series_id = std::nullopt,

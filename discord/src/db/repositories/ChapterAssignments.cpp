@@ -1,5 +1,7 @@
 // Associated Header Include
 #include "db/repositories/ChapterAssignments.hpp"
+#include "models/ModelChapterAssignment.hpp"
+#include <string>
 
 static std::vector<ChapterAssignment> buildResults(const pqxx::result &results) {
   std::vector<ChapterAssignment> assignments;
@@ -73,7 +75,8 @@ void ChapterAssignmentsRepository::clearAllCompletedBySeries(pqxx::transaction_b
 
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx::transaction_base &txn, int chapter_id, std::optional<int> task_id, std::optional<bool> completed) {
   std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE chapter_id = $1";
-  if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+  if(completed)
+    query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
   pqxx::result results;
   if(task_id) {
     query += " AND task_id = $2";
@@ -87,7 +90,8 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx:
 
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id, std::optional<bool> completed) {
   std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE user_id = $1";
-  if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+  if(completed)
+    query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
   pqxx::result results;
   if(task_id) {
     query += " AND task_id = $2";
@@ -99,9 +103,75 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByUser(pqxx::tr
   return buildResults(results);
 }
 
+std::vector<ChapterAssignment> ChapterAssignmentsRepository::listBySeries(pqxx::transaction_base &txn, std::vector<int> series_ids, std::optional<std::vector<int>> chapter_ids, std::optional<bool> completed) {
+  if(series_ids.empty())
+    return {};
+
+  pqxx::params params(txn);
+  int param_idx = 1;
+
+  std::string series_placeholders;
+  for(size_t i = 0; i < series_ids.size(); ++i) {
+    if(i > 0)
+      series_placeholders += ",";
+    series_placeholders += "$" + std::to_string(param_idx++);
+    params.append(series_ids[i]);
+  }
+
+  std::string chapter_placeholders;
+  if(chapter_ids && !chapter_ids->empty()) {
+    for(size_t i = 0; i < chapter_ids->size(); ++i) {
+      if(i > 0)
+        chapter_placeholders += ",";
+      chapter_placeholders += "$" + std::to_string(param_idx++);
+      params.append((*chapter_ids)[i]);
+    }
+  }
+
+  std::string query =
+      "SELECT user_id, chapter_id, task_id, completed_at"
+      " FROM chapters"
+      " JOIN chapter_assignments ON chapters.id = chapter_assignments.chapter_id"
+      " WHERE chapters.series_id IN (" +
+      series_placeholders + ")";
+
+  if(!chapter_placeholders.empty())
+    query += " AND chapters.id IN (" + chapter_placeholders + ")";
+
+  if(completed)
+    query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+
+  auto results = txn.exec(query, params);
+
+  return buildResults(results);
+}
+
+std::vector<int> ChapterAssignmentsRepository::listDistinctSeriesByUser(pqxx::transaction_base &txn, int user_id, std::optional<bool> completed) {
+  std::string query =
+      "SELECT DISTINCT series_id"
+      " FROM chapters"
+      " JOIN chapter_assignments ON chapters.id = chapter_assignments.chapter_id"
+      " WHERE chapter_assignments.user_id = $1";
+
+  if(completed) {
+    query += (*completed) ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+  }
+
+  auto results = txn.exec(query, pqxx::params(txn, user_id));
+
+  std::vector<int> series;
+  series.reserve(results.size());
+  for(const auto &row : results) {
+    series.emplace_back(row["series_id"].as<int>());
+  }
+
+  return series;
+}
+
 bool ChapterAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id, std::optional<bool> completed) {
   std::string query = "SELECT 1 FROM chapter_assignments WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3";
-  if(completed) query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
+  if(completed)
+    query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
   query += " LIMIT 1";
 
   auto result = txn.exec(query, pqxx::params(txn, user_id, chapter_id, task_id));

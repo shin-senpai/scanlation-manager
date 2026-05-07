@@ -25,5 +25,7 @@ public:
 
   std::vector<SeriesAssignment> listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id = std::nullopt);
 
+  std::vector<int> listDistinctSeriesByUser(pqxx::transaction_base &txn, int user_id);
+
   std::vector<CrewDetail> listBySeriesWithDetails(pqxx::transaction_base &txn, int series_id);
 };

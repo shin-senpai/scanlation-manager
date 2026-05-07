@@ -27,6 +27,9 @@ public:
   // Returns the tasks that depend on task_id.
   std::vector<TaskDependency> listDependentsOf(pqxx::transaction_base &txn, int task_id);
 
+  // Returns a map containing all task dependencies where task_id is the key
+  std::unordered_map<int, std::vector<int>> listAll(pqxx::transaction_base &txn);
+
   // Returns the name of the first prerequisite task that still has outstanding assignments
   // for chapter_id, or nullopt if all dependencies are satisfied.
   std::optional<std::string> findFirstBlockingDependency(pqxx::transaction_base &txn, int chapter_id, int task_id);

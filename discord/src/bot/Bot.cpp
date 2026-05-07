@@ -51,6 +51,7 @@
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
 #include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
+#include "bot/eventHandlers/commands/list/Todo.hpp"
 
 void Bot::fillCommandMap() {
   m_commands["ping"] = {
@@ -293,6 +294,11 @@ void Bot::fillCommandMap() {
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::infoAutocomplete(*this, key, input, e);
       }};
+
+  m_commands["todo"] = {
+      "Show your pending tasks (or another user's)",
+      [this](const dpp::slashcommand_t &e) { Commands::todo(*this, e); },
+      {dpp::command_option(dpp::co_user, "user", "User to check (defaults to yourself)", false)}};
 
   m_commands["list-chapters"] = {
       "List chapters with task completion stats",

@@ -1,6 +1,5 @@
 // Associated Header Include
 #include "db/repositories/TaskDependencies.hpp"
-#include <map>
 
 void TaskDependenciesRepository::create(pqxx::transaction_base &txn, int task_id, int depends_on_task_id) {
   txn.exec(
@@ -73,7 +72,7 @@ std::optional<std::string> TaskDependenciesRepository::findFirstBlockingDependen
       pqxx::params(txn, task_id, chapter_id));
   if(result.empty()) {
     return std::nullopt;
-}
+  }
   return result[0][0].as<std::string>();
 }
 
@@ -91,6 +90,6 @@ std::vector<std::pair<int64_t, std::string>> TaskDependenciesRepository::findDep
   assignees.reserve(result.size());
   for(const auto &row : result) {
     assignees.emplace_back(row[0].as<int64_t>(), row[1].as<std::string>());
-}
+  }
   return assignees;
 }

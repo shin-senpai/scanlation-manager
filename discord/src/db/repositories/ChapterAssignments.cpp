@@ -210,8 +210,9 @@ std::vector<std::pair<int, std::string>> ChapterAssignmentsRepository::listActiv
       pqxx::params(txn, user_id));
   std::vector<std::pair<int, std::string>> out;
   out.reserve(results.size());
-  for(const auto &row : results)
+  for(const auto &row : results) {
     out.emplace_back(row[0].as<int>(), row[1].as<std::string>());
+}
   return out;
 }
 

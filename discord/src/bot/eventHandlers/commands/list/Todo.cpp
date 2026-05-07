@@ -98,13 +98,13 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
     }
 
     const dpp::snowflake target_discord_id = std::get<dpp::snowflake>(event.get_parameter("user"));
-    const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
     if(!target_discord_id.empty()) {
       Permission permission_level = user_repo.getPermissionLevel(session.wtx(), *maybe_user_id);
       if(permission_level < Permission::manager) {
         event.edit_original_response(dpp::message("You lack the permission to check the todo list of other users."));
         return;
       }
+      const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
       if(!maybe_target_id) {
         event.edit_original_response(dpp::message("The target user is not registered."));
         return;

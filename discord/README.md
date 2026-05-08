@@ -185,7 +185,7 @@ The first user to run `/register` is automatically granted Supermanager.
 | `/work-update` | Standard (registered) |
 | `/todo` | Standard (registered) |
 | `/user-history` | Standard (registered; manager+ to view others) |
-| `/set-progress-channel` | Bot access |
+| `/set-progress-channel` | Manager |
 | `/list-roles` | Standard (registered) |
 | `/list-tasks` | Standard (registered) |
 | `/list-role-tasks` | Standard (registered) |

@@ -91,20 +91,25 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
     TasksRepository tasks_repo;
 
     int resolved_user_id;
-    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
+    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
     }
 
-    const dpp::snowflake target_discord_id = std::get<dpp::snowflake>(event.get_parameter("user"));
+    const auto param = event.get_parameter("user");
+    dpp::snowflake target_discord_id{};
+    if(const auto *id = std::get_if<dpp::snowflake>(&param)) {
+      target_discord_id = *id;
+    }
+    
     if(!target_discord_id.empty()) {
-      Permission permission_level = user_repo.getPermissionLevel(session.wtx(), *maybe_user_id);
+      Permission permission_level = user_repo.getPermissionLevel(session.rtx(), *maybe_user_id);
       if(permission_level < Permission::manager) {
         event.edit_original_response(dpp::message("You lack the permission to check the todo list of other users."));
         return;
       }
-      const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
+      const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.rtx(), static_cast<int64_t>(target_discord_id));
       if(!maybe_target_id) {
         event.edit_original_response(dpp::message("The target user is not registered."));
         return;
@@ -165,7 +170,7 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
         for(size_t i = 0; i < tasks.size(); ++i) {
           if(i > 0) {
             msg += ", ";
-}
+          }
           msg += tasks[i];
         }
         msg += "\n";

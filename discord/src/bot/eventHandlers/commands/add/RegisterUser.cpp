@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <exception>
 #include <string>
+#include <variant>
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
@@ -26,7 +27,11 @@ void Commands::registerUser(Bot &bot, const dpp::slashcommand_t &event) {
     UserRepository user_repo;
     DiscordIdentityRepository identity_repo;
 
-    const dpp::snowflake target_snowflake = std::get<dpp::snowflake>(event.get_parameter("user"));
+    const auto &param = event.get_parameter("user");
+    dpp::snowflake target_snowflake{};
+    if(const auto p = std::get_if<dpp::snowflake>(&param)) {
+      target_snowflake = *p;
+    }
 
     if(!target_snowflake.empty()) {
       const auto maybe_caller_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);

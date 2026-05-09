@@ -30,7 +30,7 @@ void Commands::listTasks(Bot &bot, const dpp::slashcommand_t &event) {
 
     std::string response = "**Tasks:**\n";
     for(const auto &task : tasks) {
-      response += "- " + task.name + " (ID: `" + std::to_string(task.id) + "`)\n";
+    response += "- " + task.name + " (ID: `" + std::to_string(task.id) + "`, Level: `" + std::to_string(task.level) + "`)\n";
     }
 
     event.edit_original_response(dpp::message(response));

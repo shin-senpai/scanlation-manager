@@ -97,12 +97,12 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
       return;
     }
 
-    const auto param = event.get_parameter("user");
+    const auto &param = event.get_parameter("user");
     dpp::snowflake target_discord_id{};
     if(const auto *id = std::get_if<dpp::snowflake>(&param)) {
       target_discord_id = *id;
     }
-    
+
     if(!target_discord_id.empty()) {
       Permission permission_level = user_repo.getPermissionLevel(session.rtx(), *maybe_user_id);
       if(permission_level < Permission::manager) {

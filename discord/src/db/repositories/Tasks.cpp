@@ -39,7 +39,7 @@ void TasksRepository::unretire(pqxx::transaction_base &txn, int id) {
 
 std::optional<Task> TasksRepository::findById(pqxx::transaction_base &txn, int id) {
   auto result = txn.exec(
-      "SELECT id, name, retired_at FROM tasks WHERE id = $1",
+      "SELECT id, level, name, retired_at FROM tasks WHERE id = $1",
       pqxx::params(txn, id));
 
   if(result.empty()) {
@@ -51,7 +51,7 @@ std::optional<Task> TasksRepository::findById(pqxx::transaction_base &txn, int i
 
 std::optional<Task> TasksRepository::findByName(pqxx::transaction_base &txn, std::string_view name) {
   auto result = txn.exec(
-      "SELECT id, name, retired_at FROM tasks WHERE name = $1",
+      "SELECT id, level, name, retired_at FROM tasks WHERE name = $1",
       pqxx::params(txn, name));
 
   if(result.empty()) {
@@ -62,7 +62,7 @@ std::optional<Task> TasksRepository::findByName(pqxx::transaction_base &txn, std
 }
 
 std::vector<Task> TasksRepository::listAll(pqxx::transaction_base &txn, bool include_retired) {
-  std::string query = "SELECT id, name, retired_at FROM tasks";
+  std::string query = "SELECT id, level, name, retired_at FROM tasks";
   if(!include_retired) {
     query += " WHERE retired_at IS NULL";
 }

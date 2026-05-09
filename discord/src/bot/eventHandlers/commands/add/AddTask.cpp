@@ -46,7 +46,7 @@ void Commands::addTask(Bot &bot, const dpp::slashcommand_t &event) {
     // but our DB stores the level as an INT, so that's why we have this
     const auto &param = event.get_parameter("level");
     int level{};
-    if(auto p = std::get_if<long>(&param)) {
+    if(const auto p = std::get_if<long>(&param)) {
       if(*p >= std::numeric_limits<int>::min() && *p <= std::numeric_limits<int>::max()) {
         level = *p;
       } else {

@@ -11,6 +11,7 @@
 
 // Standard Includes
 #include <iostream>
+#include <limits>
 #include <string>
 
 // Third Party Includes
@@ -41,7 +42,23 @@ void Commands::addTask(Bot &bot, const dpp::slashcommand_t &event) {
 
     const std::string name = std::get<std::string>(event.get_parameter("name"));
 
-    const int task_id = tasks_repo.create(session.wtx(), name);
+    // The reason we do this roundabout method of getting an int is because the std::variant inside event.get_parameter(...) doesn't support int as a valid type
+    // but our DB stores the level as an INT, so that's why we have this
+    const auto &param = event.get_parameter("level");
+    int level{};
+    if(auto p = std::get_if<long>(&param)) {
+      if(*p >= std::numeric_limits<int>::min() && *p <= std::numeric_limits<int>::max()) {
+        level = *p;
+      } else {
+        event.edit_original_response(dpp::message("Level has to be between **" + std::to_string(std::numeric_limits<int>::min()) + "** and **" + std::to_string(std::numeric_limits<int>::max()) + "**."));
+        return;
+      }
+    } else {
+      event.edit_original_response(dpp::message("You provided an invalid level."));
+      return;
+    }
+
+    const int task_id = tasks_repo.create(session.wtx(), name, level);
     session.commit();
 
     event.edit_original_response(dpp::message("Task **" + name + "** created with ID `" + std::to_string(task_id) + "`."));

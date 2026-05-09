@@ -13,7 +13,7 @@
 
 class TasksRepository {
 public:
-  int create(pqxx::transaction_base &txn, std::string_view name);
+  int create(pqxx::transaction_base &txn, std::string_view name, int level);
 
   void remove(pqxx::transaction_base &txn, int id);
 

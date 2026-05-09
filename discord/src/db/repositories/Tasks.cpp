@@ -5,15 +5,16 @@ namespace {
 Task rowToTask(const pqxx::row &row) {
   return Task{
       row["id"].as<int>(),
+      row["level"].as<int>(),
       row["name"].as<std::string>(),
       row["retired_at"].is_null() ? std::nullopt : std::make_optional(row["retired_at"].as<std::string>())};
 }
 } // namespace
 
-int TasksRepository::create(pqxx::transaction_base &txn, std::string_view name) {
+int TasksRepository::create(pqxx::transaction_base &txn, std::string_view name, int level) {
   auto result = txn.exec(
-      "INSERT INTO tasks (name) VALUES ($1) RETURNING id",
-      pqxx::params(txn, name));
+      "INSERT INTO tasks (name, level) VALUES ($1, $2) RETURNING id",
+      pqxx::params(txn, name, level));
 
   return result[0]["id"].as<int>();
 }

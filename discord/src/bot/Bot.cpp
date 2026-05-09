@@ -104,7 +104,9 @@ void Bot::fillCommandMap() {
   m_commands["add-task"] = {
       "Create a new task type",
       [this](const dpp::slashcommand_t &e) { Commands::addTask(*this, e); },
-      {dpp::command_option(dpp::co_string, "name", "Name of the task", true)}};
+      {
+        dpp::command_option(dpp::co_string, "name", "Name of the task", true),
+        dpp::command_option(dpp::co_number, "level", "Level of the task", true)}};
 
   m_commands["series"] = {
       "Manage a series",

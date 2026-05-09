@@ -6,6 +6,7 @@
 
 struct Task {
   int id;
+  int level;
   std::string name;
   std::optional<std::string> retired_at;
 };

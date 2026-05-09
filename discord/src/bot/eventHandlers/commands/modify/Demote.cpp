@@ -40,25 +40,25 @@ void Commands::demote(Bot &bot, const dpp::slashcommand_t &event) {
     DiscordIdentityRepository identity_repo;
     UserRepository user_repo;
 
-    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
+    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
     }
 
-    if(user_repo.getPermissionLevel(session.rtx(), *maybe_user_id) < Permission::supermanager) {
+    if(user_repo.getPermissionLevel(session.wtx(), *maybe_user_id) < Permission::supermanager) {
       event.edit_original_response(dpp::message("You lack the permission to perform this action."));
       return;
     }
 
     const dpp::snowflake target_discord_id = std::get<dpp::snowflake>(event.get_parameter("user"));
-    const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.rtx(), static_cast<int64_t>(target_discord_id));
+    const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
     if(!maybe_target_id) {
       event.edit_original_response(dpp::message("That user is not registered."));
       return;
     }
 
-    const Permission current = user_repo.getPermissionLevel(session.rtx(), *maybe_target_id);
+    const Permission current = user_repo.getPermissionLevel(session.wtx(), *maybe_target_id);
     if(current == Permission::standard) {
       event.edit_original_response(dpp::message("<@" + std::to_string(target_discord_id) + "> is already Standard."));
       return;

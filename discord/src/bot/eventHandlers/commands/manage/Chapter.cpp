@@ -37,8 +37,13 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   ChapterAssignmentsRepository chapter_assignments_repo;
 
   const std::string series_name = std::get<std::string>(event.get_parameter("series"));
-  const double number = std::get<double>(event.get_parameter("number"));
   const std::string name = std::get<std::string>(event.get_parameter("name"));
+
+  const double number = std::get<double>(event.get_parameter("number"));
+  if(number < 0) {
+    event.edit_original_response(dpp::message("Chapter number cannot be negative."));
+    return;
+  }
 
   std::optional<int> volume = std::nullopt;
   try {

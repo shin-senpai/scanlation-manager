@@ -86,7 +86,7 @@ void Commands::userHistory(Bot &bot, const dpp::slashcommand_t &event) {
     std::string series_label;
     const auto &series_param = event.get_parameter("series");
     std::string series_name{};
-    if(const auto p = std::get_if<dpp::snowflake>(&user_param)) {
+    if(const auto p = std::get_if<dpp::snowflake>(&series_param)) {
       series_name = *p;
     }
     if(!series_name.empty()) {

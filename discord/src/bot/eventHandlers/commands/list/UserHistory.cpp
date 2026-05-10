@@ -59,7 +59,11 @@ void Commands::userHistory(Bot &bot, const dpp::slashcommand_t &event) {
     // Resolve target user
     int resolved_user_id;
     std::string target_display;
-    const dpp::snowflake target_snowflake = std::get<dpp::snowflake>(event.get_parameter("user"));
+    const auto &user_param = event.get_parameter("user");
+    dpp::snowflake target_snowflake{};
+    if(const auto p = std::get_if<dpp::snowflake>(&user_param)) {
+      target_snowflake = *p;
+    }
     if(!target_snowflake.empty()) {
       if(caller_perm < Permission::manager) {
         event.edit_original_response(dpp::message("You lack the permission to view other users' history."));
@@ -80,7 +84,11 @@ void Commands::userHistory(Bot &bot, const dpp::slashcommand_t &event) {
     // Resolve optional series filter
     std::optional<int> series_id;
     std::string series_label;
-    const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+    const auto &series_param = event.get_parameter("series");
+    std::string series_name{};
+    if(const auto p = std::get_if<dpp::snowflake>(&user_param)) {
+      series_name = *p;
+    }
     if(!series_name.empty()) {
       const auto maybe_series = series_repo.findByName(session.rtx(), series_name);
       if(!maybe_series) {

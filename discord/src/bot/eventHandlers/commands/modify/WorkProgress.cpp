@@ -35,7 +35,7 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
     TaskDependenciesRepository task_deps_repo;
     ChapterAssignmentsRepository assignments_repo;
 
-    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
+    const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
@@ -46,35 +46,35 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
     const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
     const std::string task_name = std::get<std::string>(event.get_parameter("task"));
 
-    const auto maybe_series = series_repo.findByName(session.rtx(), series_name);
+    const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
     if(!maybe_series) {
       event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
       return;
     }
 
-    const auto maybe_chapter = chapters_repo.findByName(session.rtx(), maybe_series->id, chapter_name);
+    const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
     if(!maybe_chapter) {
       event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** not found in **" + series_name + "**."));
       return;
     }
 
-    const auto maybe_task = tasks_repo.findByName(session.rtx(), task_name);
+    const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
     if(!maybe_task) {
       event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
       return;
     }
 
-    if(!assignments_repo.exists(session.rtx(), user_id, maybe_chapter->id, maybe_task->id)) {
+    if(!assignments_repo.exists(session.wtx(), user_id, maybe_chapter->id, maybe_task->id)) {
       event.edit_original_response(dpp::message("You are not assigned to **" + task_name + "** for **" + chapter_name + "**."));
       return;
     }
 
-    if(assignments_repo.exists(session.rtx(), user_id, maybe_chapter->id, maybe_task->id, true)) {
+    if(assignments_repo.exists(session.wtx(), user_id, maybe_chapter->id, maybe_task->id, true)) {
       event.edit_original_response(dpp::message("You have already completed **" + task_name + "** for **" + chapter_name + "**."));
       return;
     }
 
-    if(task_deps_repo.findFirstBlockingDependency(session.rtx(), maybe_chapter->id, maybe_task->id)) {
+    if(task_deps_repo.findFirstBlockingDependency(session.wtx(), maybe_chapter->id, maybe_task->id)) {
       event.edit_original_response(dpp::message(
           "Cannot complete **" + task_name + "**: still has incomplete dependencies.**"));
       return;
@@ -85,7 +85,7 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
 
     std::string msg = "Marked **" + task_name + "** complete for **" + chapter_name + "** (" + series_name + ").";
 
-    const auto dependents = task_deps_repo.findDependentAssignees(session.rtx(), maybe_chapter->id, maybe_task->id);
+    const auto dependents = task_deps_repo.findDependentAssignees(session.wtx(), maybe_chapter->id, maybe_task->id);
     if(!dependents.empty()) {
       std::map<std::string, std::string> task_pings;
       for(const auto &[did, dep_task] : dependents) {
@@ -117,7 +117,7 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
 
     if(key == "series") {
       SeriesRepository series_repo;
-      for(const auto &s : series_repo.list(session.rtx())) {
+      for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
           r.add_autocomplete_choice(dpp::command_option_choice(s.name, s.name));
         }
@@ -128,9 +128,9 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
       if(!series_name.empty()) {
         SeriesRepository series_repo;
         ChaptersRepository chapters_repo;
-        const auto maybe_series = series_repo.findByName(session.rtx(), series_name);
+        const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
         if(maybe_series) {
-          for(const auto &c : chapters_repo.listBySeries(session.rtx(), maybe_series->id)) {
+          for(const auto &c : chapters_repo.listBySeries(session.wtx(), maybe_series->id)) {
             if(lower_input.empty() || to_lower(c.name).find(lower_input) != std::string::npos) {
               r.add_autocomplete_choice(dpp::command_option_choice(c.name, c.name));
             }
@@ -148,16 +148,16 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
         ChapterAssignmentsRepository assignments_repo;
         TasksRepository tasks_repo;
 
-        const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.rtx(), discord_id);
-        const auto maybe_series = series_repo.findByName(session.rtx(), series_name);
+        const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
+        const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
         if(maybe_user_id && maybe_series) {
-          const auto maybe_chapter = chapters_repo.findByName(session.rtx(), maybe_series->id, chapter_name);
+          const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
           if(maybe_chapter) {
-            for(const auto &a : assignments_repo.listByChapter(session.rtx(), maybe_chapter->id, std::nullopt, false)) {
+            for(const auto &a : assignments_repo.listByChapter(session.wtx(), maybe_chapter->id, std::nullopt, false)) {
               if(a.user_id != static_cast<int>(*maybe_user_id)) {
                 continue;
 }
-              const auto maybe_task = tasks_repo.findById(session.rtx(), a.task_id);
+              const auto maybe_task = tasks_repo.findById(session.wtx(), a.task_id);
               if(!maybe_task) {
                 continue;
 }

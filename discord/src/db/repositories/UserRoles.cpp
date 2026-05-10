@@ -13,6 +13,12 @@ void UserRolesRepository::remove(pqxx::transaction_base &txn, int user_id, int r
       pqxx::params(txn, user_id, role_id));
 }
 
+void UserRolesRepository::removeAllByRole(pqxx::transaction_base &txn, int role_id) {
+  txn.exec(
+      "DELETE FROM user_roles WHERE role_id = $1",
+      pqxx::params(txn, role_id));
+}
+
 std::vector<UserRole> UserRolesRepository::listByUser(pqxx::transaction_base &txn, int user_id) {
   auto results = txn.exec(
       "SELECT user_id, role_id FROM user_roles WHERE user_id = $1",

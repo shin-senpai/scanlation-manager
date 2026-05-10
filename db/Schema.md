@@ -102,7 +102,7 @@ Which roles a user holds — their general capabilities, independent of any spec
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `user_id` | `INT` | No | — | FK → `users(id)` |
-| `role_id` | `INT` | No | — | FK → `roles(id)` |
+| `role_id` | `INT` | No | — | FK → `roles(id)` ON DELETE CASCADE |
 
 **PK:** `(user_id, role_id)`
 
@@ -135,7 +135,8 @@ Individual chapters belonging to a series.
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
-| `series_id` | `INT` | No | — | FK → `series(id)` |
+| `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
+| `volume` | `INT` | Yes | — | Volume number, if the series uses a volume structure. `NULL` = not part of a named volume (e.g. web release). Not unique — multiple chapters share the same volume. |
 | `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
 | `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
 | `status` | `TEXT` | No | `'in_progress'` | See check constraint below |
@@ -159,9 +160,12 @@ Custom task types that must be completed before a chapter can be released (e.g. 
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
 | `name` | `CITEXT` | No | — | Unique |
+| `retired_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = active. Set when the task has completion history and cannot be hard-deleted. |
 
 **Unique constraints:**
 - `tasks_name_key` on `(name)`
+
+**Soft-delete behaviour:** A task with any completed `chapter_assignments` row cannot be hard-deleted — it must be retired instead (`retired_at = NOW()`). Retired tasks are excluded from `/list-tasks` by default and cannot be assigned to new work, but their completion history is preserved.
 
 ---
 
@@ -171,8 +175,8 @@ Defines which tasks must be completed before others can start.
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
-| `task_id` | `INT` | No | — | FK → `tasks(id)` — the task that has a prerequisite |
-| `depends_on_task_id` | `INT` | No | — | FK → `tasks(id)` — the task that must be done first |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE — the task that has a prerequisite |
+| `depends_on_task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE — the task that must be done first |
 
 **PK:** `(task_id, depends_on_task_id)`
 
@@ -187,8 +191,8 @@ Maps which tasks a role is responsible for. Used to validate task assignments �
 
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
-| `role_id` | `INT` | No | — | FK → `roles(id)` |
-| `task_id` | `INT` | No | — | FK → `tasks(id)` |
+| `role_id` | `INT` | No | — | FK → `roles(id)` ON DELETE CASCADE |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE |
 
 **PK:** `(role_id, task_id)`
 
@@ -204,8 +208,8 @@ Which users are assigned to a series for a given task — the default crew. Used
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `user_id` | `INT` | No | — | FK → `users(id)` |
-| `series_id` | `INT` | No | — | FK → `series(id)` |
-| `task_id` | `INT` | No | — | FK → `tasks(id)` |
+| `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE |
 
 **PK:** `(user_id, series_id, task_id)`
 
@@ -221,7 +225,7 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 | Column | Type | Nullable | Default | Notes |
 |--------|------|----------|---------|-------|
 | `user_id` | `INT` | No | — | FK → `users(id)` |
-| `chapter_id` | `INT` | No | — | FK → `chapters(id)` |
+| `chapter_id` | `INT` | No | — | FK → `chapters(id)` ON DELETE CASCADE |
 | `task_id` | `INT` | No | — | FK → `tasks(id)` |
 | `completed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = outstanding; non-null = done, value is the completion timestamp |
 
@@ -229,6 +233,9 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 
 **Indexes:**
 - `idx_chapter_assignments_chapter_id` on `(chapter_id)` — the PK only covers lookups by `user_id`; this index covers `listByChapter`
+
+**Triggers:**
+- `enforce_completed_assignment_immutable` — before DELETE, raises if `completed_at IS NOT NULL`. Completed rows are permanent historical records; only outstanding rows may be removed.
 
 ---
 
@@ -241,6 +248,9 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 | `enforce_supermanager_exists` | `users` | INSERT, UPDATE, DELETE | Raises if no active user (`left_at IS NULL`) has `permission_level = 2` |
 | `enforce_user_name` | `users` | INSERT, UPDATE | Raises if the user has no active `discord_identities` row and `name IS NULL` |
 | `enforce_discord_user_name` | `discord_identities` | INSERT, UPDATE, DELETE | Raises if the affected user would be left with no active Discord link and no `name` |
+| `enforce_completed_assignment_immutable` | `chapter_assignments` | DELETE | Raises if the row being deleted has `completed_at IS NOT NULL` — completed records are permanent |
+| `roles_normalize_name` | `roles` | INSERT, UPDATE | Sets `NEW.name = UPPER(NEW.name)` before write — role names are always stored uppercase |
+| `tasks_normalize_name` | `tasks` | INSERT, UPDATE | Sets `NEW.name = UPPER(NEW.name)` before write — task names are always stored uppercase |
 
 ---
 
@@ -259,5 +269,7 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 - **Permissions:** A single `permission_level` integer (`0`/`1`/`2`) replaces the old `is_manager`/`is_supermanager` boolean flags. At least one active supermanager (`2`) must always exist.
 - **Roles vs tasks:** `roles` describe what a user *can* do. `tasks` describe the steps a chapter requires. `role_tasks` connects them for assignment validation. Assignments themselves (`series_assignments`, `chapter_assignments`) are task-scoped — not role-scoped — to avoid ambiguity.
 - **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion timestamp in one column. To-do list = `WHERE completed_at IS NULL`; history = `WHERE completed_at IS NOT NULL`.
-- **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved.
+- **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved. Tasks follow a hybrid approach: hard-deleted if they have no completion history, soft-deleted (`retired_at`) otherwise to preserve the record.
+- **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, and `task_dependencies`. Deleting a series cascades to `series_assignments` and `chapters`; deleting a chapter cascades to `chapter_assignments`. The `chapter_assignments` cascade fires the immutability trigger, so application code must `NULL` out `completed_at` on any completed rows before deleting a chapter or series with completion history (supermanager path only — managers are blocked from deleting anything with completed history). `chapter_assignments.task_id` has no cascade — tasks with completion history must be retired rather than deleted to preserve the record.
 - **Case insensitivity:** `citext` columns compare and enforce uniqueness case-insensitively but store values exactly as inserted. `PR` and `pr` cannot coexist; a lookup for either finds the same row.
+- **Name normalization:** `roles.name` and `tasks.name` are additionally normalized to uppercase on write via a `BEFORE INSERT OR UPDATE` trigger. Any casing passed in (`pR`, `pr`, `PR`) is stored and returned as `PR`. `series.name` and `chapters.name` are excluded — those are display names where casing is meaningful.

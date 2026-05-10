@@ -2,11 +2,11 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "default",
-      "displayName": "Clang Ninja Preset",
-      "description": "Sets Ninja generator and Clang compilers",
+      "name": "base",
+      "hidden": true,
+      "displayName": "Base",
+      "description": "Shared Clang/Ninja settings inherited by all presets",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
@@ -14,12 +14,38 @@
         "CMAKE_CXX_STANDARD_REQUIRED": "ON",
         "CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS": "/usr/bin/clang-scan-deps-18"
       }
+    },
+    {
+      "name": "default",
+      "inherits": "base",
+      "displayName": "Debug",
+      "description": "Debug build with full debug info and no optimisation",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release",
+      "description": "Release build with optimisations and stripped debug info",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [
     {
       "name": "default",
+      "displayName": "Debug",
       "configurePreset": "default"
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "release"
     }
   ]
 }

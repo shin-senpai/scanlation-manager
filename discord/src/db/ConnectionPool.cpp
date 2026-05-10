@@ -15,7 +15,7 @@
 #include <pqxx/pqxx>
 
 ConnectionPool::ConnectionPool(const std::string &connStr, size_t size) {
-  if (size == 0) {
+  if(size == 0) {
     throw std::invalid_argument("db_pool_size must be greater than 0");
   }
 

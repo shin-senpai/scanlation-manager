@@ -12,8 +12,8 @@ A management platform for scanlation groups. Built as a monorepo where a shared 
 scanlation-manager/
 ├── discord/     # C++ Discord bot — primary active module
 ├── db/          # PostgreSQL schema (migrations + Docker Compose)
-├── backend/     # REST API — not yet implemented (placeholder)
-└── frontend/    # Web UI — not yet implemented (placeholder)
+├── backend/     # Go REST API — external storage integrations (Google Drive, S3)
+└── frontend/    # Web UI — not yet started
 ```
 
 ---
@@ -30,9 +30,16 @@ scanlation-manager/
 ### Build
 ```bash
 cd discord
+
+# Debug (default)
 cmake --preset default
 cmake --build --preset default
-./build/scanlation-manager   # config.json is auto-copied to build/ on build
+./build/debug/scanlation-manager   # config.json is auto-copied to build/debug/ on build
+
+# Release
+cmake --preset release
+cmake --build --preset release
+./build/release/scanlation-manager
 ```
 
 Dependencies D++ and libpqxx are fetched automatically by CMake on first build. nlohmann_json and libcurl must be installed on the system.
@@ -43,10 +50,10 @@ The bot reads `discord/config.json` (copied to `build/config.json` at build time
 cp discord/config.json.example discord/config.json
 ```
 
-Required keys: `discord_bot_token`, `guild_id`, `database`
-Optional keys: `work_progress_channel`, `gsheet_auth_token`, `gsheet_priv_api_url`
+Required keys: `discord_bot_token`, `guild_id`, `db_connection_string`, `db_pool_size`
+Optional keys: `work_progress_channel`, `staff_role_id`, `gsheet_auth_token`, `gsheet_priv_api_url`
 
-The `database` value is a libpq connection string, e.g.:
+The `db_connection_string` value is a libpq connection string, e.g.:
 `"host=localhost port=5432 dbname=scanlation user=postgres password=secret"`
 
 ### Source Layout
@@ -56,7 +63,12 @@ discord/
 │   ├── bot/
 │   │   ├── Bot.hpp
 │   │   ├── eventHandlers/
-│   │   │   ├── commands/         # One header per slash command
+│   │   │   ├── commands/
+│   │   │   │   ├── add/          # Commands that create new records
+│   │   │   │   ├── modify/       # Commands that update existing records
+│   │   │   │   ├── list/         # Read-only / query commands
+│   │   │   │   ├── remove/       # Commands that delete records
+│   │   │   │   └── manage/       # Multi-operation entity commands (e.g. /series, /chapter)
 │   │   │   └── triggers/         # One header per message trigger
 │   │   └── utils/                # BotUtils, ChannelUtils
 │   ├── db/
@@ -71,13 +83,14 @@ discord/
 ```
 
 ### Adding a New Slash Command
-1. Add a header in `include/bot/eventHandlers/commands/MyCommand.hpp` and implementation in `src/bot/eventHandlers/commands/MyCommand.cpp`
-2. Register the command in `Bot::fillCommandMap()` in `Bot.cpp`
-3. CMake picks up new `.cpp` files automatically via `GLOB_RECURSE`
+1. Pick the right subdirectory under `commands/`: `add/`, `modify/`, `list/`, `remove/`, or `manage/` (for commands that span multiple operation types via subcommands)
+2. Add a header in `include/bot/eventHandlers/commands/<subdir>/MyCommand.hpp` and implementation in `src/bot/eventHandlers/commands/<subdir>/MyCommand.cpp`
+3. Register the command in `Bot::fillCommandMap()` in `Bot.cpp`
+4. CMake picks up new `.cpp` files automatically via `GLOB_RECURSE`
 
 ### Adding a New Repository
 1. Add header/impl under `include/db/repositories/` and `src/db/repositories/`
-2. Use a `DbSession` obtained from `Bot::getDb().session()` — call `session->commit()` on success; the destructor releases the connection automatically
+2. In a command handler, construct `DbSession session(bot.getPool())` — call `session.commit()` on success; the destructor releases the connection back to the pool automatically
 
 ### Code Style
 Enforced by `.clang-format` (run `clang-format -i` on changed files):
@@ -118,6 +131,10 @@ psql "$DATABASE_URL" -f db/migrations/014_add_hiatus_to_chapter_status.sql
 psql "$DATABASE_URL" -f db/migrations/015_add_missing_indexes.sql
 psql "$DATABASE_URL" -f db/migrations/016_citext_name_columns.sql
 psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
+psql "$DATABASE_URL" -f db/migrations/018_cascade_deletes_and_task_retirement.sql
+psql "$DATABASE_URL" -f db/migrations/019_uppercase_role_task_names.sql
+psql "$DATABASE_URL" -f db/migrations/020_add_volume_to_chapters.sql
+psql "$DATABASE_URL" -f db/migrations/021_cascade_series_and_chapter_deletes.sql
 ```
 
 ### Key Schema Notes
@@ -125,6 +142,8 @@ psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
 - Every user must have either a `name` (webapp) or a row in `discord_identities` — enforced by a constraint trigger
 - At least one supermanager must always exist — enforced by a constraint trigger
 - `chapter_assignments.completed_at` is both the "done" flag and the completion record — `NULL` means outstanding, non-null means done
+- Tasks can be hard-deleted only if they have no completed `chapter_assignments`; otherwise they must be retired (`tasks.retired_at`)
+- Deleting a role or task cascades to related junction tables at the DB level (`ON DELETE CASCADE`); `chapter_assignments` is excluded from cascade to preserve history
 
 ---
 
@@ -135,7 +154,31 @@ psql "$DATABASE_URL" -f db/migrations/017_add_chapter_number.sql
 | `/ping` | Done |
 | `/register` | Done |
 | `/set-progress-channel` | Done |
+| `/set-staff-role` | Done |
 | `/set-alias` | Done |
+| `/add-role` | Done |
+| `/add-task` | Done |
+| `/sync-role` | Done |
+| `/assign-role` | Done |
+| `/remove-role` | Done |
+| `/delete-role` | Done |
+| `/delete-task` | Done |
+| `/retire-task` | Done |
+| `/unretire-task` | Done |
+| `/map-role-task` | Done |
+| `/unmap-role-task` | Done |
+| `/list-roles` | Done |
+| `/list-tasks` | Done |
+| `/list-role-tasks` | Done |
+| `/series` (add, set-status, assign, unassign, remove) | Done |
+| `/chapter` (add, set-status, assign, unassign, uncomplete, remove) | Done |
+| `/list-series` | Done |
+| `/list-chapters` | Done |
+| `/info` (series, chapter) | Done |
+| `/promote` | Done |
+| `/demote` | Done |
+| `/work-update` | Done |
+| `/todo` | Done |
+| `/user-history` | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
-| `/work-update` | In progress — autocomplete hardcoded |
 | Google Sheets sync | Not started |

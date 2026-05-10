@@ -11,6 +11,9 @@
 #include "db/repositories/Series.hpp"
 #include "db/repositories/TaskDependencies.hpp"
 #include "db/repositories/Tasks.hpp"
+#include "db/repositories/User.hpp"
+#include "types/ChapterStatus.hpp"
+#include "types/Permission.hpp"
 
 // Standard Includes
 #include <algorithm>
@@ -23,24 +26,47 @@
 #include <pqxx/pqxx>
 
 void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
-  event.thinking(true);
+  event.thinking(false);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
   try {
     DbSession session(bot.getPool());
     DiscordIdentityRepository identity_repo;
+    UserRepository user_repo;
     SeriesRepository series_repo;
     ChaptersRepository chapters_repo;
     TasksRepository tasks_repo;
     TaskDependenciesRepository task_deps_repo;
     ChapterAssignmentsRepository assignments_repo;
 
+    int resolved_user_id;
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
       event.edit_original_response(dpp::message("You are not registered. Please run /register first."));
       return;
     }
-    const int user_id = static_cast<int>(*maybe_user_id);
+
+    const auto &param = event.get_parameter("user");
+    dpp::snowflake target_discord_id{};
+    if(const auto *id = std::get_if<dpp::snowflake>(&param)) {
+      target_discord_id = *id;
+    }
+    if(!target_discord_id.empty()) {
+      Permission permission_level = user_repo.getPermissionLevel(session.wtx(), *maybe_user_id);
+      if(permission_level < Permission::manager) {
+        event.edit_original_response(dpp::message("You lack the permission to check the todo list of other users."));
+        return;
+      }
+      const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
+      if(!maybe_target_id) {
+        event.edit_original_response(dpp::message("The target user is not registered."));
+        return;
+      }
+      resolved_user_id = *maybe_target_id;
+    } else {
+      resolved_user_id = *maybe_user_id;
+      target_discord_id = discord_id;
+    }
 
     const std::string series_name = std::get<std::string>(event.get_parameter("series"));
     const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
@@ -64,26 +90,25 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    if(!assignments_repo.exists(session.wtx(), user_id, maybe_chapter->id, maybe_task->id)) {
+    if(!assignments_repo.exists(session.wtx(), resolved_user_id, maybe_chapter->id, maybe_task->id)) {
       event.edit_original_response(dpp::message("You are not assigned to **" + task_name + "** for **" + chapter_name + "**."));
       return;
     }
 
-    if(assignments_repo.exists(session.wtx(), user_id, maybe_chapter->id, maybe_task->id, true)) {
+    if(assignments_repo.exists(session.wtx(), resolved_user_id, maybe_chapter->id, maybe_task->id, true)) {
       event.edit_original_response(dpp::message("You have already completed **" + task_name + "** for **" + chapter_name + "**."));
       return;
     }
 
     if(task_deps_repo.findFirstBlockingDependency(session.wtx(), maybe_chapter->id, maybe_task->id)) {
       event.edit_original_response(dpp::message(
-          "Cannot complete **" + task_name + "**: still has incomplete dependencies.**"));
+          "Cannot complete **" + task_name + "**: still has incomplete dependencies."));
       return;
     }
 
-    assignments_repo.setCompleted(session.wtx(), user_id, maybe_chapter->id, maybe_task->id);
-    session.commit();
+    assignments_repo.setCompleted(session.wtx(), resolved_user_id, maybe_chapter->id, maybe_task->id);
 
-    std::string msg = "Marked **" + task_name + "** complete for **" + chapter_name + "** (" + series_name + ").";
+    std::string msg = "<@" + std::to_string(target_discord_id) + "> Marked **" + task_name + "** complete for **" + chapter_name + "** (" + series_name + ").";
 
     const auto dependents = task_deps_repo.findDependentAssignees(session.wtx(), maybe_chapter->id, maybe_task->id);
     if(!dependents.empty()) {
@@ -94,9 +119,15 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
       for(const auto &[dep_task, pings] : task_pings) {
         msg += "\n" + pings + "— **" + task_name + "** is done, you can now proceed with **" + dep_task + "**.";
       }
+    } else {
+      ChapterStatus cs = ChapterStatus::released;
+      chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, cs);
     }
+    session.commit();
 
-    event.edit_original_response(dpp::message(msg));
+    dpp::message response(msg);
+    response.allowed_mentions.parse_users = true;
+    event.edit_original_response(response);
   } catch(const std::exception &e) {
     std::cerr << "workProgress failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("Failed to record progress. Contact the administrator to resolve this issue."));
@@ -156,11 +187,11 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
             for(const auto &a : assignments_repo.listByChapter(session.wtx(), maybe_chapter->id, std::nullopt, false)) {
               if(a.user_id != static_cast<int>(*maybe_user_id)) {
                 continue;
-}
+              }
               const auto maybe_task = tasks_repo.findById(session.wtx(), a.task_id);
               if(!maybe_task) {
                 continue;
-}
+              }
               if(lower_input.empty() || to_lower(maybe_task->name).find(lower_input) != std::string::npos) {
                 r.add_autocomplete_choice(dpp::command_option_choice(maybe_task->name, maybe_task->name));
               }

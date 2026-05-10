@@ -19,29 +19,37 @@ void TaskDependenciesRepository::removeAllByTask(pqxx::transaction_base &txn, in
       pqxx::params(txn, task_id));
 }
 
-std::vector<TaskDependency> TaskDependenciesRepository::listDependenciesOf(pqxx::transaction_base &txn, int task_id) {
+bool TaskDependenciesRepository::exists(pqxx::transaction_base &txn, int task_id, int depends_on_task_id) {
+  auto result = txn.exec(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id = $1 AND depends_on_task_id = $2 LIMIT 1",
+      pqxx::params(txn, task_id, depends_on_task_id));
+
+  return !result.empty();
+}
+
+std::vector<int> TaskDependenciesRepository::listDependenciesOf(pqxx::transaction_base &txn, int task_id) {
   auto results = txn.exec(
-      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id = $1",
+      "SELECT depends_on_task_id FROM task_dependencies WHERE task_id = $1",
       pqxx::params(txn, task_id));
 
-  std::vector<TaskDependency> deps;
+  std::vector<int> deps;
   deps.reserve(results.size());
   for(const auto &row : results) {
-    deps.emplace_back(row["task_id"].as<int>(), row["depends_on_task_id"].as<int>());
+    deps.emplace_back(row["depends_on_task_id"].as<int>());
   }
 
   return deps;
 }
 
-std::vector<TaskDependency> TaskDependenciesRepository::listDependentsOf(pqxx::transaction_base &txn, int task_id) {
+std::vector<int> TaskDependenciesRepository::listDependentsOf(pqxx::transaction_base &txn, int task_id) {
   auto results = txn.exec(
-      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE depends_on_task_id = $1",
+      "SELECT task_id FROM task_dependencies WHERE depends_on_task_id = $1",
       pqxx::params(txn, task_id));
 
-  std::vector<TaskDependency> deps;
+  std::vector<int> deps;
   deps.reserve(results.size());
   for(const auto &row : results) {
-    deps.emplace_back(row["task_id"].as<int>(), row["depends_on_task_id"].as<int>());
+    deps.emplace_back(row["task_id"].as<int>());
   }
 
   return deps;

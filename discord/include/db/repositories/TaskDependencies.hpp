@@ -1,7 +1,6 @@
 #pragma once
 
 // User Defined Includes
-#include "models/ModelTaskDependency.hpp"
 
 // Standard Includes
 #include <cstdint>
@@ -21,11 +20,13 @@ public:
 
   void removeAllByTask(pqxx::transaction_base &txn, int task_id);
 
+  bool exists(pqxx::transaction_base &txn, int task_id, int depends_on_task_id);
+
   // Returns the tasks that task_id depends on.
-  std::vector<TaskDependency> listDependenciesOf(pqxx::transaction_base &txn, int task_id);
+  std::vector<int> listDependenciesOf(pqxx::transaction_base &txn, int task_id);
 
   // Returns the tasks that depend on task_id.
-  std::vector<TaskDependency> listDependentsOf(pqxx::transaction_base &txn, int task_id);
+  std::vector<int> listDependentsOf(pqxx::transaction_base &txn, int task_id);
 
   // Returns a map containing all task dependencies where task_id is the key
   std::unordered_map<int, std::vector<int>> listAll(pqxx::transaction_base &txn);

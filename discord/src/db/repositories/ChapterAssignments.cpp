@@ -276,7 +276,7 @@ std::vector<UserHistoryEntry> ChapterAssignmentsRepository::listCompletedByUserW
         row["series_name"].as<std::string>(),
         row["volume"].is_null() ? std::nullopt : std::make_optional(row["volume"].as<int>()),
         row["chapter_number"].as<double>(),
-        row["chapter_name"].as<std::string>(),
+        row["chapter_name"].is_null() ? std::nullopt : std::make_optional(row["chapter_name"].as<std::string>()),
         row["task_name"].as<std::string>(),
         row["completed_at"].as<std::string>()});
   }

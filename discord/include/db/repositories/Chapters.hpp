@@ -16,7 +16,7 @@
 
 class ChaptersRepository {
 public:
-  int create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name, std::optional<int> volume = std::nullopt);
+  int create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name = std::nullopt, std::optional<int> volume = std::nullopt);
 
   std::optional<Chapter> findById(pqxx::transaction_base &txn, int id);
 
@@ -33,6 +33,9 @@ public:
       std::optional<int> series_id = std::nullopt,
       std::optional<ChapterStatus> status_filter = std::nullopt,
       bool sort_chronological = false);
+
+  // Looks up a chapter by name, falling back to "Ch.X" / "Vol.X Ch.X" number format for unnamed chapters.
+  std::optional<Chapter> findByDisplayKey(pqxx::transaction_base &txn, int series_id, std::string_view key);
 
   void updateStatus(pqxx::transaction_base &txn, int id, ChapterStatus status);
 

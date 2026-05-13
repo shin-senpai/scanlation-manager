@@ -18,8 +18,10 @@
 #include "types/Permission.hpp"
 
 // Standard Includes
+#include <cmath>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <string>
 
 // Third Party Includes
@@ -30,6 +32,15 @@
 
 namespace {
 
+std::string fmtChapterNumber(double n) {
+  if(n == std::floor(n)) {
+    return std::to_string(static_cast<int>(n));
+  }
+  std::ostringstream oss;
+  oss << n;
+  return oss.str();
+}
+
 void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
@@ -37,7 +48,11 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   ChapterAssignmentsRepository chapter_assignments_repo;
 
   const std::string series_name = std::get<std::string>(event.get_parameter("series"));
-  const std::string name = std::get<std::string>(event.get_parameter("name"));
+  std::optional<std::string> name;
+  const auto &name_param = event.get_parameter("name");
+  if(const auto *p = std::get_if<std::string>(&name_param); p && !p->empty()) {
+    name = *p;
+  }
 
   const double number = std::get<double>(event.get_parameter("number"));
   if(number < 0) {
@@ -45,11 +60,10 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  std::optional<int> volume = std::nullopt;
-  try {
-    volume = static_cast<int>(std::get<int64_t>(event.get_parameter("volume")));
-  } catch(...) {
-    // Optional parameter not provided
+  std::optional<int> volume;
+  const auto &volume_param = event.get_parameter("volume");
+  if(const auto *p = std::get_if<int64_t>(&volume_param)) {
+    volume = static_cast<int>(*p);
   }
 
   const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
@@ -66,7 +80,8 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
     }
     session.commit();
-    event.edit_original_response(dpp::message("Chapter **" + name + "** added to **" + series_name + "** with ID `" + std::to_string(chapter_id) + "`."));
+    const std::string display = name ? "**" + *name + "**" : "**Ch." + fmtChapterNumber(number) + "**";
+    event.edit_original_response(dpp::message("Chapter " + display + " added to **" + series_name + "** with ID `" + std::to_string(chapter_id) + "`." ));
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("A chapter with that number or name already exists in **" + series_name + "**."));
   }
@@ -86,7 +101,7 @@ void doSetStatus(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
@@ -119,7 +134,7 @@ void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
@@ -184,7 +199,7 @@ void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
@@ -237,7 +252,7 @@ void doUncomplete(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
@@ -287,7 +302,7 @@ void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission u
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
@@ -393,8 +408,9 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
         const auto maybe_series = series_repo.findByName(session.wtx(), series_ctx);
         if(maybe_series) {
           for(const auto &c : chapters_repo.listBySeries(session.wtx(), maybe_series->id)) {
-            if(lower_input.empty() || to_lower(c.name).find(lower_input) != std::string::npos) {
-              r.add_autocomplete_choice(dpp::command_option_choice(c.name, c.name));
+            const std::string display = c.name ? *c.name : "Ch." + fmtChapterNumber(c.number);
+            if(lower_input.empty() || to_lower(display).find(lower_input) != std::string::npos) {
+              r.add_autocomplete_choice(dpp::command_option_choice(display, display));
             }
           }
         }

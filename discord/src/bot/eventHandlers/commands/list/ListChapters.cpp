@@ -16,14 +16,29 @@
 // Standard Includes
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
+
+namespace {
+
+std::string fmtChapterNumber(double n) {
+  if(n == std::floor(n)) {
+    return std::to_string(static_cast<int>(n));
+  }
+  std::ostringstream oss;
+  oss << n;
+  return oss.str();
+}
+
+} // namespace
 
 void Commands::listChapters(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(true);
@@ -91,7 +106,7 @@ void Commands::listChapters(Bot &bot, const dpp::slashcommand_t &event) {
       if(show_series) {
         line += "[" + c.series_name + "] ";
       }
-      line += "**" + c.name + "** (" + status_str + ") — " + task_str + " | " + date;
+      line += "**" + c.name.value_or("Ch." + fmtChapterNumber(c.number)) + "** (" + status_str + ") — " + task_str + " | " + date;
       lines.push_back(std::move(line));
     }
 

@@ -17,13 +17,28 @@
 
 // Standard Includes
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 
 // Third Party Includes
 #include <dpp/dispatcher.h>
 #include <pqxx/pqxx>
+
+namespace {
+
+std::string fmtChapterNumber(double n) {
+  if(n == std::floor(n)) {
+    return std::to_string(static_cast<int>(n));
+  }
+  std::ostringstream oss;
+  oss << n;
+  return oss.str();
+}
+
+} // namespace
 
 void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
   event.thinking(false);
@@ -78,7 +93,7 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
-    const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+    const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
     if(!maybe_chapter) {
       event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** not found in **" + series_name + "**."));
       return;
@@ -162,8 +177,9 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
         const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
         if(maybe_series) {
           for(const auto &c : chapters_repo.listBySeries(session.wtx(), maybe_series->id)) {
-            if(lower_input.empty() || to_lower(c.name).find(lower_input) != std::string::npos) {
-              r.add_autocomplete_choice(dpp::command_option_choice(c.name, c.name));
+            const std::string display = c.name ? *c.name : "Ch." + fmtChapterNumber(c.number);
+            if(lower_input.empty() || to_lower(display).find(lower_input) != std::string::npos) {
+              r.add_autocomplete_choice(dpp::command_option_choice(display, display));
             }
           }
         }
@@ -182,7 +198,7 @@ void Commands::workProgressAutocomplete(Bot &bot, const std::string &key, const 
         const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
         const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
         if(maybe_user_id && maybe_series) {
-          const auto maybe_chapter = chapters_repo.findByName(session.wtx(), maybe_series->id, chapter_name);
+          const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
           if(maybe_chapter) {
             for(const auto &a : assignments_repo.listByChapter(session.wtx(), maybe_chapter->id, std::nullopt, false)) {
               if(a.user_id != static_cast<int>(*maybe_user_id)) {

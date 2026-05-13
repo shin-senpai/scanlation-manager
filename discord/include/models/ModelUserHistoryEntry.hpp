@@ -8,7 +8,7 @@ struct UserHistoryEntry {
   std::string series_name;
   std::optional<int> volume;
   double chapter_number;
-  std::string chapter_name;
+  std::optional<std::string> chapter_name;
   std::string task_name;
   std::string completed_at; // YYYY-MM-DD
 };

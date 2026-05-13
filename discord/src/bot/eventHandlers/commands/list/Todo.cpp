@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -153,13 +154,21 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
       task_name_map[t.id] = t.name;
     }
 
-    // Group: series name → chapter name → [task names]
+    auto chapterDisplayName = [](const Chapter &ch) -> std::string {
+      if(ch.name) return *ch.name;
+      if(ch.number == std::floor(ch.number)) return "Ch." + std::to_string(static_cast<int>(ch.number));
+      std::ostringstream oss;
+      oss << ch.number;
+      return "Ch." + oss.str();
+    };
+
+    // Group: series name → chapter display name → [task names]
     std::map<std::string, std::map<std::string, std::vector<std::string>>> grouped;
     for(const auto &a : next_in_line) {
       const auto ch = chapter_map.at(a.chapter_id);
       const std::string &sname = series_name_map.at(ch.series_id);
       const std::string tname = task_name_map.at(a.task_id);
-      grouped[sname][ch.name].push_back(tname);
+      grouped[sname][chapterDisplayName(ch)].push_back(tname);
     }
 
     std::string msg = "**To-do list:**\n";

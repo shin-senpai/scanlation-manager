@@ -151,7 +151,7 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_sub_command, "add", "Add a chapter to a series")
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_number, "number", "Chapter number (e.g. 51 or 51.1)", true))
-              .add_option(dpp::command_option(dpp::co_string, "name", "Display name (e.g. Ch 51)", true))
+              .add_option(dpp::command_option(dpp::co_string, "name", "Display name (e.g. Ch 51)", false))
               .add_option(dpp::command_option(dpp::co_integer, "volume", "Volume number", false)),
           dpp::command_option(dpp::co_sub_command, "set-status", "Update chapter status")
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))

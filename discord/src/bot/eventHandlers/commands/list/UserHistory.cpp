@@ -85,8 +85,8 @@ void Commands::userHistory(Bot &bot, const dpp::slashcommand_t &event) {
     std::optional<int> series_id;
     std::string series_label;
     const auto &series_param = event.get_parameter("series");
-    std::string series_name{};
-    if(const auto p = std::get_if<dpp::snowflake>(&series_param)) {
+    std::string series_name;
+    if(const auto *p = std::get_if<std::string>(&series_param)) {
       series_name = *p;
     }
     if(!series_name.empty()) {
@@ -109,7 +109,9 @@ void Commands::userHistory(Bot &bot, const dpp::slashcommand_t &event) {
         line += "Vol." + std::to_string(*e.volume) + " ";
       }
       line += "Ch." + fmtChapterNumber(e.chapter_number);
-      line += " \"" + e.chapter_name + "\"";
+      if(e.chapter_name) {
+        line += " \"" + *e.chapter_name + "\"";
+      }
       line += " — " + e.task_name;
       line += " | " + BotUtils::toDiscordTimestamp(e.completed_at);
       lines.push_back(std::move(line));

@@ -102,7 +102,10 @@ void doSeriesInfo(const dpp::slashcommand_t &event, DbSession &session) {
       if(c.volume) {
         line += "Vol." + std::to_string(*c.volume) + " ";
       }
-      line += "Ch." + fmtChapterNumber(c.number) + " " + c.name;
+      line += "Ch." + fmtChapterNumber(c.number);
+      if(c.name) {
+        line += " " + *c.name;
+      }
       line += " (" + chapterStatusToString(c.status) + ")";
       line += " — " + std::to_string(c.completed_tasks) + "/" + std::to_string(c.total_tasks) + " tasks";
       out += line + "\n";
@@ -130,7 +133,7 @@ void doChapterInfo(const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto maybe_chapter = chapters_repo.findByName(session.rtx(), maybe_series->id, chapter_name);
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.rtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** not found in series **" + series_name + "**."));
     return;
@@ -143,7 +146,7 @@ void doChapterInfo(const dpp::slashcommand_t &event, DbSession &session) {
   std::string out;
 
   // Header
-  out += "**" + ch.name + "** · " + maybe_series->name + "\n";
+  out += "**" + ch.name.value_or("Ch." + fmtChapterNumber(ch.number)) + "** · " + maybe_series->name + "\n";
   std::string meta;
   if(ch.volume) {
     meta += "Vol." + std::to_string(*ch.volume) + " · ";
@@ -187,7 +190,11 @@ void doUserInfo(const dpp::slashcommand_t &event, DbSession &session, int caller
   ChapterAssignmentsRepository chapter_assignments_repo;
 
   int resolved_user_id;
-  const dpp::snowflake target_snowflake = std::get<dpp::snowflake>(event.get_parameter("user"));
+  const auto &user_param = event.get_parameter("user");
+  dpp::snowflake target_snowflake{};
+  if(const auto *p = std::get_if<dpp::snowflake>(&user_param)) {
+    target_snowflake = *p;
+  }
   if(!target_snowflake.empty()) {
     if(caller_permission < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to view other users info."));
@@ -327,8 +334,9 @@ void Commands::infoAutocomplete(Bot &bot, const std::string &key, const std::str
         const auto maybe_series = series_repo.findByName(session.rtx(), series_ctx);
         if(maybe_series) {
           for(const auto &c : chapters_repo.listBySeries(session.rtx(), maybe_series->id)) {
-            if(lower_input.empty() || to_lower(c.name).find(lower_input) != std::string::npos) {
-              r.add_autocomplete_choice(dpp::command_option_choice(c.name, c.name));
+            const std::string display = c.name ? *c.name : "Ch." + fmtChapterNumber(c.number);
+            if(lower_input.empty() || to_lower(display).find(lower_input) != std::string::npos) {
+              r.add_autocomplete_choice(dpp::command_option_choice(display, display));
             }
           }
         }

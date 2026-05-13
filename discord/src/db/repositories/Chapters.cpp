@@ -1,6 +1,9 @@
 // Associated Header Include
 #include "db/repositories/Chapters.hpp"
 
+// Standard Includes
+#include <string>
+
 namespace {
 Chapter rowToChapter(const pqxx::row &row) {
   return Chapter{
@@ -8,14 +11,14 @@ Chapter rowToChapter(const pqxx::row &row) {
       row["series_id"].as<int>(),
       row["volume"].is_null() ? std::nullopt : std::make_optional(row["volume"].as<int>()),
       row["number"].as<double>(),
-      row["name"].as<std::string>(),
+      row["name"].is_null() ? std::nullopt : std::make_optional(row["name"].as<std::string>()),
       chapterStatusFromString(row["status"].as<std::string>()),
       row["added_at"].as<std::string>(),
       row["closed_at"].is_null() ? std::nullopt : std::make_optional(row["closed_at"].as<std::string>())};
 }
 } // namespace
 
-int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::string_view name, std::optional<int> volume) {
+int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name, std::optional<int> volume) {
   auto result = txn.exec(
       "INSERT INTO chapters (series_id, number, name, volume) VALUES ($1, $2, $3, $4) RETURNING id",
       pqxx::params(txn, series_id, number, name, volume));
@@ -112,6 +115,20 @@ std::vector<Chapter> ChaptersRepository::listBySeriesIds(pqxx::transaction_base 
   return chapters;
 }
 
+std::optional<Chapter> ChaptersRepository::findByDisplayKey(pqxx::transaction_base &txn, int series_id, std::string_view key) {
+  if(auto by_name = findByName(txn, series_id, key)) {
+    return by_name;
+  }
+  const std::string key_str(key);
+  const auto ch_pos = key_str.find("Ch.");
+  if(ch_pos != std::string::npos) {
+    try {
+      return findByNumber(txn, series_id, std::stod(key_str.substr(ch_pos + 3)));
+    } catch(...) {}
+  }
+  return std::nullopt;
+}
+
 void ChaptersRepository::updateStatus(pqxx::transaction_base &txn, int id, ChapterStatus status) {
   txn.exec(
       "UPDATE chapters SET status = $2, closed_at = CASE WHEN $2 IN ('in_progress', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",
@@ -184,7 +201,7 @@ std::vector<ChapterWithStats> ChaptersRepository::listWithStats(
         row["series_name"].as<std::string>(),
         row["volume"].is_null() ? std::nullopt : std::make_optional(row["volume"].as<int>()),
         row["number"].as<double>(),
-        row["name"].as<std::string>(),
+        row["name"].is_null() ? std::nullopt : std::make_optional(row["name"].as<std::string>()),
         chapterStatusFromString(row["status"].as<std::string>()),
         row["added_at"].as<std::string>(),
         row["closed_at"].is_null() ? std::nullopt : std::make_optional(row["closed_at"].as<std::string>()),

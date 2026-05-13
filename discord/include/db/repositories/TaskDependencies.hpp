@@ -28,6 +28,13 @@ public:
   // Returns the tasks that depend on task_id.
   std::vector<int> listDependentsOf(pqxx::transaction_base &txn, int task_id);
 
+  // Name-resolved variants for display.
+  std::vector<std::string> listDependencyNamesOf(pqxx::transaction_base &txn, int task_id);
+  std::vector<std::string> listDependentNamesOf(pqxx::transaction_base &txn, int task_id);
+
+  // Returns all non-retired tasks paired with the names of their prerequisites, ordered by task name.
+  std::vector<std::pair<std::string, std::vector<std::string>>> listAllWithDependencyNames(pqxx::transaction_base &txn);
+
   // Returns a map containing all task dependencies where task_id is the key
   std::unordered_map<int, std::vector<int>> listAll(pqxx::transaction_base &txn);
 

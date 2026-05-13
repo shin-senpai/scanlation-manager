@@ -32,6 +32,7 @@
 #include "bot/eventHandlers/commands/add/SyncRole.hpp"
 #include "bot/eventHandlers/commands/list/Info.hpp"
 #include "bot/eventHandlers/commands/list/ListChapters.hpp"
+#include "bot/eventHandlers/commands/list/ListTaskDeps.hpp"
 #include "bot/eventHandlers/commands/list/ListRoleTasks.hpp"
 #include "bot/eventHandlers/commands/list/ListRoles.hpp"
 #include "bot/eventHandlers/commands/list/ListSeries.hpp"
@@ -53,6 +54,7 @@
 #include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
 #include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
 #include "bot/eventHandlers/commands/remove/RemoveRole.hpp"
+#include "bot/eventHandlers/commands/remove/RemoveTaskDep.hpp"
 #include "bot/eventHandlers/commands/remove/UnmapRoleTask.hpp"
 
 void Bot::fillCommandMap() {
@@ -114,6 +116,23 @@ void Bot::fillCommandMap() {
        dpp::command_option(dpp::co_string, "depends_on_task", "The Dependence", true).set_auto_complete(true)},
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::setTaskDependencyAutocomplete(*this, key, input, e);
+      }};
+
+  m_commands["list-task-deps"] = {
+      "List dependencies for a task",
+      [this](const dpp::slashcommand_t &e) { Commands::listTaskDeps(*this, e); },
+      {dpp::command_option(dpp::co_string, "task", "Task to inspect (omit for all tasks)", false).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::listTaskDepsAutocomplete(*this, key, input, e);
+      }};
+
+  m_commands["remove-task-dep"] = {
+      "Remove a task dependency",
+      [this](const dpp::slashcommand_t &e) { Commands::removeTaskDep(*this, e); },
+      {dpp::command_option(dpp::co_string, "task", "The dependent task", true).set_auto_complete(true),
+       dpp::command_option(dpp::co_string, "depends_on_task", "The dependency to remove", true).set_auto_complete(true)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::removeTaskDepAutocomplete(*this, key, input, e);
       }};
 
   m_commands["series"] = {

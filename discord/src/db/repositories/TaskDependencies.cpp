@@ -55,6 +55,59 @@ std::vector<int> TaskDependenciesRepository::listDependentsOf(pqxx::transaction_
   return deps;
 }
 
+std::vector<std::string> TaskDependenciesRepository::listDependencyNamesOf(pqxx::transaction_base &txn, int task_id) {
+  auto results = txn.exec(
+      "SELECT t.name FROM task_dependencies td"
+      " JOIN tasks t ON t.id = td.depends_on_task_id"
+      " WHERE td.task_id = $1"
+      " ORDER BY t.name",
+      pqxx::params(txn, task_id));
+  std::vector<std::string> names;
+  names.reserve(results.size());
+  for(const auto &row : results) {
+    names.emplace_back(row[0].as<std::string>());
+  }
+  return names;
+}
+
+std::vector<std::string> TaskDependenciesRepository::listDependentNamesOf(pqxx::transaction_base &txn, int task_id) {
+  auto results = txn.exec(
+      "SELECT t.name FROM task_dependencies td"
+      " JOIN tasks t ON t.id = td.task_id"
+      " WHERE td.depends_on_task_id = $1"
+      " ORDER BY t.name",
+      pqxx::params(txn, task_id));
+  std::vector<std::string> names;
+  names.reserve(results.size());
+  for(const auto &row : results) {
+    names.emplace_back(row[0].as<std::string>());
+  }
+  return names;
+}
+
+std::vector<std::pair<std::string, std::vector<std::string>>> TaskDependenciesRepository::listAllWithDependencyNames(pqxx::transaction_base &txn) {
+  auto results = txn.exec(
+      "SELECT t.name AS task_name, dep.name AS dep_name"
+      " FROM tasks t"
+      " LEFT JOIN task_dependencies td ON td.task_id = t.id"
+      " LEFT JOIN tasks dep ON dep.id = td.depends_on_task_id"
+      " WHERE t.retired_at IS NULL"
+      " ORDER BY t.name, dep.name",
+      pqxx::params(txn));
+
+  std::vector<std::pair<std::string, std::vector<std::string>>> out;
+  for(const auto &row : results) {
+    const std::string task_name = row["task_name"].as<std::string>();
+    if(out.empty() || out.back().first != task_name) {
+      out.emplace_back(task_name, std::vector<std::string>{});
+    }
+    if(!row["dep_name"].is_null()) {
+      out.back().second.emplace_back(row["dep_name"].as<std::string>());
+    }
+  }
+  return out;
+}
+
 std::unordered_map<int, std::vector<int>> TaskDependenciesRepository::listAll(pqxx::transaction_base &txn) {
   auto results = txn.exec(
       "SELECT task_id, depends_on_task_id FROM task_dependencies",

@@ -154,9 +154,13 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
       task_name_map[t.id] = t.name;
     }
 
-    auto chapterDisplayName = [](const Chapter &ch) -> std::string {
-      if(ch.name) return *ch.name;
-      if(ch.number == std::floor(ch.number)) return "Ch." + std::to_string(static_cast<int>(ch.number));
+    auto chapter_display_name = [](const Chapter &ch) -> std::string {
+      if(ch.name) {
+        return *ch.name;
+      }
+      if(ch.number == std::floor(ch.number)) {
+        return "Ch." + std::to_string(static_cast<int>(ch.number));
+      }
       std::ostringstream oss;
       oss << ch.number;
       return "Ch." + oss.str();
@@ -168,7 +172,7 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
       const auto ch = chapter_map.at(a.chapter_id);
       const std::string &sname = series_name_map.at(ch.series_id);
       const std::string tname = task_name_map.at(a.task_id);
-      grouped[sname][chapterDisplayName(ch)].push_back(tname);
+      grouped[sname][chapter_display_name(ch)].push_back(tname);
     }
 
     std::string msg = "**To-do list:**\n";

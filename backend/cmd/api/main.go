@@ -9,7 +9,9 @@ import (
 	"scanlation-manager/backend/internal/config"
 	"scanlation-manager/backend/internal/handlers"
 	"scanlation-manager/backend/internal/services/gdrive"
+	"scanlation-manager/backend/internal/services/gsheets"
 	"scanlation-manager/backend/internal/services/s3"
+	"scanlation-manager/backend/internal/services/sheetdb"
 )
 
 func main() {
@@ -30,8 +32,26 @@ func main() {
 		log.Printf("init s3: %v", err)
 	}
 
+	var sheetsSvc *gsheets.Client
+	var dbSvc *sheetdb.Client
+	if cfg.GSheetSpreadsheetID != "" && cfg.GDriveCredentials != "" {
+		sheetsSvc, err = gsheets.New(ctx, cfg.GDriveCredentials, cfg.GSheetSpreadsheetID)
+		if err != nil {
+			log.Printf("init google sheets: %v", err)
+		}
+	}
+	if cfg.DBConnectionString != "" && sheetsSvc != nil {
+		dbSvc, err = sheetdb.New(ctx, cfg.DBConnectionString)
+		if err != nil {
+			log.Printf("init sheetdb: %v", err)
+		}
+	}
+	if sheetsSvc != nil && dbSvc != nil {
+		log.Printf("google sheets integration enabled (spreadsheet: %s)", cfg.GSheetSpreadsheetID)
+	}
+
 	mux := http.NewServeMux()
-	handlers.RegisterRoutes(mux, gdriveSvc, s3Svc)
+	handlers.RegisterRoutes(mux, gdriveSvc, s3Svc, sheetsSvc, dbSvc, cfg.APIToken)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("starting server on %s", addr)

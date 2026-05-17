@@ -15,6 +15,13 @@ type Config struct {
 	S3AccessKeyID     string `json:"s3_access_key_id"`
 	S3SecretAccessKey string `json:"s3_secret_access_key"`
 	S3Bucket          string `json:"s3_bucket"`
+
+	// Google Sheets integration (optional)
+	GSheetSpreadsheetID string `json:"gsheet_spreadsheet_id"` // ID of the target spreadsheet
+	APIToken            string `json:"api_token"`             // PSK checked on all /sheets/* requests from the bot
+
+	// PostgreSQL connection (used by Google Sheets sync to read current state)
+	DBConnectionString string `json:"db_connection_string"` // libpq-style connection string
 }
 
 func Load() (*Config, error) {

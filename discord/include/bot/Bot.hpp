@@ -33,6 +33,8 @@ private:
   dpp::snowflake m_work_progress_channel;
   dpp::snowflake m_staff_role_id;
   const dpp::snowflake m_guild_id;
+  std::string m_backend_url;
+  std::string m_api_token;
   ConfigManager &m_config;
   ConnectionPool m_pool;
 
@@ -64,6 +66,8 @@ public:
   const dpp::cluster &getCore() const;
   ConnectionPool &getPool();
   dpp::snowflake getStaffRole();
+  const std::string &getBackendUrl() const;
+  const std::string &getApiToken() const;
 
   void setWorkProgressChannel(dpp::snowflake channel_id);
   void setStaffRole(dpp::snowflake role_id);

@@ -4,6 +4,7 @@
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "bot/utils/GetAutoCompleteContext.hpp"
+#include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
@@ -41,7 +42,7 @@ std::string fmtChapterNumber(double n) {
   return oss.str();
 }
 
-void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
+void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
   SeriesAssignmentsRepository series_assignments_repo;
@@ -80,6 +81,8 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
     }
     session.commit();
+    SheetSync::syncSeries(bot, series_name);
+    SheetSync::syncTodo(bot);
     const std::string display = name ? "**" + *name + "**" : "**Ch." + fmtChapterNumber(number) + "**";
     event.edit_original_response(dpp::message("Chapter " + display + " added to **" + series_name + "** with ID `" + std::to_string(chapter_id) + "`." ));
   } catch(const pqxx::unique_violation &) {
@@ -87,7 +90,7 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   }
 }
 
-void doSetStatus(const dpp::slashcommand_t &event, DbSession &session) {
+void doSetStatus(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
 
@@ -109,12 +112,14 @@ void doSetStatus(const dpp::slashcommand_t &event, DbSession &session) {
 
   chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, chapterStatusFromString(status_str));
   session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message(
       "Chapter **" + chapter_name + "** status set to **" + status_str + "**."));
 }
 
-void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
+void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
   ChapterAssignmentsRepository assignments_repo;
@@ -174,6 +179,8 @@ void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
   try {
     assignments_repo.create(session.wtx(), *maybe_target_id, maybe_chapter->id, maybe_task->id);
     session.commit();
+    SheetSync::syncSeries(bot, series_name);
+    SheetSync::syncTodo(bot);
     event.edit_original_response(dpp::message(
         "<@" + std::to_string(target_discord_id) + "> assigned to **" + chapter_name + "** for **" + task_name + "**."));
   } catch(const pqxx::unique_violation &) {
@@ -181,7 +188,7 @@ void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
   }
 }
 
-void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
+void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
   ChapterAssignmentsRepository assignments_repo;
@@ -229,12 +236,14 @@ void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
 
   assignments_repo.remove(session.wtx(), *maybe_target_id, maybe_chapter->id, maybe_task->id);
   session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message(
       "<@" + std::to_string(target_discord_id) + "> removed from **" + chapter_name + "** for **" + task_name + "**."));
 }
 
-void doUncomplete(const dpp::slashcommand_t &event, DbSession &session) {
+void doUncomplete(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
   ChapterAssignmentsRepository assignments_repo;
@@ -283,12 +292,14 @@ void doUncomplete(const dpp::slashcommand_t &event, DbSession &session) {
 
   assignments_repo.clearCompleted(session.wtx(), *maybe_target_id, maybe_chapter->id, maybe_task->id);
   session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message(
       "**" + task_name + "** marked as outstanding for <@" + std::to_string(target_discord_id) + "> on **" + chapter_name + "**."));
 }
 
-void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
+void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
   ChapterAssignmentsRepository assignments_repo;
@@ -323,6 +334,8 @@ void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission u
   // Cascades to chapter_assignments via ON DELETE CASCADE.
   chapters_repo.remove(session.wtx(), maybe_chapter->id);
   session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message(
       "Chapter **" + chapter_name + "** deleted from **" + series_name + "**."));
@@ -358,19 +371,17 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
     }
 
     if(sub == "add") {
-      doAdd(event, session);
+      doAdd(bot, event, session);
     } else if(sub == "set-status") {
-      {
-        doSetStatus(event, session);
-      }
+      doSetStatus(bot, event, session);
     } else if(sub == "assign") {
-      doAssign(event, session);
+      doAssign(bot, event, session);
     } else if(sub == "unassign") {
-      doUnassign(event, session);
+      doUnassign(bot, event, session);
     } else if(sub == "uncomplete") {
-      doUncomplete(event, session);
+      doUncomplete(bot, event, session);
     } else if(sub == "remove") {
-      doRemove(event, session, user_perm);
+      doRemove(bot, event, session, user_perm);
     }
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;

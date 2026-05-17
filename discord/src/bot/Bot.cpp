@@ -41,6 +41,7 @@
 #include "bot/eventHandlers/commands/list/Todo.hpp"
 #include "bot/eventHandlers/commands/list/UserHistory.hpp"
 #include "bot/eventHandlers/commands/manage/Chapter.hpp"
+#include "bot/eventHandlers/commands/manage/Gsheet.hpp"
 #include "bot/eventHandlers/commands/manage/Series.hpp"
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
 #include "bot/eventHandlers/commands/modify/Demote.hpp"
@@ -133,6 +134,14 @@ void Bot::fillCommandMap() {
        dpp::command_option(dpp::co_string, "depends_on_task", "The dependency to remove", true).set_auto_complete(true)},
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::removeTaskDepAutocomplete(*this, key, input, e);
+      }};
+
+  m_commands["gsheet"] = {
+      "Manage Google Sheets integration",
+      [this](const dpp::slashcommand_t &e) { Commands::gsheet(*this, e); },
+      {
+          dpp::command_option(dpp::co_sub_command, "enable", "Enable Google Sheets sync"),
+          dpp::command_option(dpp::co_sub_command, "disable", "Disable Google Sheets sync"),
       }};
 
   m_commands["series"] = {
@@ -422,11 +431,21 @@ dpp::snowflake Bot::getStaffRole() {
   return m_staff_role_id;
 }
 
+const std::string &Bot::getBackendUrl() const {
+  return m_backend_url;
+}
+
+const std::string &Bot::getApiToken() const {
+  return m_api_token;
+}
+
 Bot::Bot(ConfigManager &cfg)
     : m_core(cfg.getRequired<std::string>("discord_bot_token"), dpp::i_default_intents | dpp::i_message_content | dpp::i_guild_members),
       m_work_progress_channel(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("work_progress_channel"))),
       m_staff_role_id(static_cast<dpp::snowflake>(cfg.getOptional<uint64_t>("staff_role_id"))),
       m_guild_id(static_cast<dpp::snowflake>(cfg.getRequired<uint64_t>("guild_id"))),
+      m_backend_url(cfg.getOptional<std::string>("backend_url")),
+      m_api_token(cfg.getOptional<std::string>("api_token")),
       m_config(cfg),
       m_pool(cfg.getRequired<std::string>("db_connection_string"), cfg.getRequired<size_t>("db_pool_size")) {
 

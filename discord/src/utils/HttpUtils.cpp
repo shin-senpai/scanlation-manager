@@ -104,10 +104,10 @@ static int executeRequest(CurlWrapper &wrapper, const std::string &url,
     return 0;
   }
 
-  int http_code{};
+  long http_code{};
   curl_easy_getinfo(wrapper.getCurl(), CURLINFO_RESPONSE_CODE, &http_code);
 
-  return http_code;
+  return static_cast<int>(http_code);
 }
 
 int httpGet(const std::string &url, const std::vector<std::string> &headers,

@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
@@ -28,7 +29,7 @@
 
 namespace {
 
-void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
+void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
 
   const std::string name = std::get<std::string>(event.get_parameter("name"));
@@ -36,13 +37,14 @@ void doAdd(const dpp::slashcommand_t &event, DbSession &session) {
   try {
     const int id = series_repo.create(session.wtx(), name);
     session.commit();
+    SheetSync::syncSeries(bot, name);
     event.edit_original_response(dpp::message("Series **" + name + "** created with ID `" + std::to_string(id) + "`."));
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("A series with that name already exists."));
   }
 }
 
-void doSetStatus(const dpp::slashcommand_t &event, DbSession &session) {
+void doSetStatus(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
 
   const std::string name = std::get<std::string>(event.get_parameter("name"));
@@ -56,11 +58,13 @@ void doSetStatus(const dpp::slashcommand_t &event, DbSession &session) {
 
   series_repo.updateStatus(session.wtx(), maybe_series->id, seriesStatusFromString(status_str));
   session.commit();
+  SheetSync::syncSeries(bot, name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message("Series **" + name + "** status set to **" + status_str + "**."));
 }
 
-void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
+void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   SeriesAssignmentsRepository assignments_repo;
   TasksRepository tasks_repo;
@@ -112,6 +116,7 @@ void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
   try {
     assignments_repo.create(session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
     session.commit();
+    SheetSync::syncSeries(bot, series_name);
     event.edit_original_response(dpp::message(
         "<@" + std::to_string(target_discord_id) + "> assigned to **" + series_name + "** for **" + task_name + "**."));
   } catch(const pqxx::unique_violation &) {
@@ -119,7 +124,7 @@ void doAssign(const dpp::slashcommand_t &event, DbSession &session) {
   }
 }
 
-void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
+void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   SeriesAssignmentsRepository assignments_repo;
   TasksRepository tasks_repo;
@@ -154,12 +159,13 @@ void doUnassign(const dpp::slashcommand_t &event, DbSession &session) {
 
   assignments_repo.remove(session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
   session.commit();
+  SheetSync::syncSeries(bot, series_name);
 
   event.edit_original_response(dpp::message(
       "<@" + std::to_string(target_discord_id) + "> removed from **" + series_name + "** for **" + task_name + "**."));
 }
 
-void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
+void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
   SeriesRepository series_repo;
   ChapterAssignmentsRepository chapter_assignments_repo;
 
@@ -186,6 +192,8 @@ void doRemove(const dpp::slashcommand_t &event, DbSession &session, Permission u
   // Cascades: series → series_assignments, series → chapters → chapter_assignments.
   series_repo.remove(session.wtx(), maybe_series->id);
   session.commit();
+  SheetSync::deleteSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
 
   event.edit_original_response(dpp::message(
       "Series **" + series_name + "** and all its chapters have been deleted."));
@@ -221,16 +229,16 @@ void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
     }
 
     if(sub == "add") {
-      doAdd(event, session);
+      doAdd(bot, event, session);
     } else if(sub == "set-status") {
-      doSetStatus(event, session);
+      doSetStatus(bot, event, session);
     } else if(sub == "assign") {
-      doAssign(event, session);
+      doAssign(bot, event, session);
     } else if(sub == "unassign") {
-      doUnassign(event, session);
+      doUnassign(bot, event, session);
     } else if(sub == "remove") {
-      doRemove(event, session, user_perm);
-}
+      doRemove(bot, event, session, user_perm);
+    }
   } catch(const std::exception &e) {
     std::cerr << "series/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
     event.edit_original_response(dpp::message("An error occurred. Contact the administrator to resolve this issue."));

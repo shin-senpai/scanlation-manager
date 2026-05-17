@@ -12,6 +12,7 @@ static std::vector<ChapterAssignment> buildResults(const pqxx::result &results) 
         row["user_id"].as<int>(),
         row["chapter_id"].as<int>(),
         row["task_id"].as<int>(),
+        row["assigned_at"].as<std::string>(),
         row["completed_at"].is_null() ? std::nullopt : std::make_optional(row["completed_at"].as<std::string>()));
   }
   return assignments;
@@ -75,10 +76,10 @@ void ChapterAssignmentsRepository::clearAllCompletedBySeries(pqxx::transaction_b
 }
 
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx::transaction_base &txn, int chapter_id, std::optional<int> task_id, std::optional<bool> completed) {
-  std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE chapter_id = $1";
+  std::string query = "SELECT user_id, chapter_id, task_id, assigned_at, completed_at FROM chapter_assignments WHERE chapter_id = $1";
   if(completed) {
     query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
-}
+  }
   pqxx::result results;
   if(task_id) {
     query += " AND task_id = $2";
@@ -91,10 +92,10 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByChapter(pqxx:
 }
 
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByUser(pqxx::transaction_base &txn, int user_id, std::optional<int> task_id, std::optional<bool> completed) {
-  std::string query = "SELECT user_id, chapter_id, task_id, completed_at FROM chapter_assignments WHERE user_id = $1";
+  std::string query = "SELECT user_id, chapter_id, task_id, assigned_at, completed_at FROM chapter_assignments WHERE user_id = $1";
   if(completed) {
     query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
-}
+  }
   pqxx::result results;
   if(task_id) {
     query += " AND task_id = $2";
@@ -109,7 +110,7 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listByUser(pqxx::tr
 std::vector<ChapterAssignment> ChapterAssignmentsRepository::listBySeries(pqxx::transaction_base &txn, std::vector<int> series_ids, std::optional<std::vector<int>> chapter_ids, std::optional<bool> completed) {
   if(series_ids.empty()) {
     return {};
-}
+  }
 
   pqxx::params params(txn);
   int param_idx = 1;
@@ -118,7 +119,7 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listBySeries(pqxx::
   for(size_t i = 0; i < series_ids.size(); ++i) {
     if(i > 0) {
       series_placeholders += ",";
-}
+    }
     series_placeholders += "$" + std::to_string(param_idx++);
     params.append(series_ids[i]);
   }
@@ -128,14 +129,15 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listBySeries(pqxx::
     for(size_t i = 0; i < chapter_ids->size(); ++i) {
       if(i > 0) {
         chapter_placeholders += ",";
-}
+      }
       chapter_placeholders += "$" + std::to_string(param_idx++);
       params.append((*chapter_ids)[i]);
     }
   }
 
   std::string query =
-      "SELECT user_id, chapter_id, task_id, completed_at"
+      "SELECT chapter_assignments.user_id, chapter_assignments.chapter_id,"
+      " chapter_assignments.task_id, chapter_assignments.assigned_at, chapter_assignments.completed_at"
       " FROM chapters"
       " JOIN chapter_assignments ON chapters.id = chapter_assignments.chapter_id"
       " WHERE chapters.series_id IN (" +
@@ -143,11 +145,11 @@ std::vector<ChapterAssignment> ChapterAssignmentsRepository::listBySeries(pqxx::
 
   if(!chapter_placeholders.empty()) {
     query += " AND chapters.id IN (" + chapter_placeholders + ")";
-}
+  }
 
   if(completed) {
     query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
-}
+  }
 
   auto results = txn.exec(query, params);
 
@@ -180,7 +182,7 @@ bool ChapterAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_
   std::string query = "SELECT 1 FROM chapter_assignments WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3";
   if(completed) {
     query += *completed ? " AND completed_at IS NOT NULL" : " AND completed_at IS NULL";
-}
+  }
   query += " LIMIT 1";
 
   auto result = txn.exec(query, pqxx::params(txn, user_id, chapter_id, task_id));
@@ -212,7 +214,7 @@ std::vector<std::pair<int, std::string>> ChapterAssignmentsRepository::listActiv
   out.reserve(results.size());
   for(const auto &row : results) {
     out.emplace_back(row[0].as<int>(), row[1].as<std::string>());
-}
+  }
   return out;
 }
 

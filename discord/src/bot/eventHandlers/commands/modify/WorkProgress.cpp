@@ -4,6 +4,7 @@
 // User Defined Includes
 #include "bot/Bot.hpp"
 #include "bot/utils/GetAutoCompleteContext.hpp"
+#include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
@@ -139,6 +140,8 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
       chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, cs);
     }
     session.commit();
+    SheetSync::syncSeries(bot, series_name);
+    SheetSync::syncTodo(bot);
 
     dpp::message response(msg);
     response.allowed_mentions.parse_users = true;

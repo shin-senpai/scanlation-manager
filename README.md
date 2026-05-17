@@ -2,7 +2,7 @@
 
 A management platform for scanlation groups — tracking series, chapters, tasks, and contributors. The project is built as a monorepo with a shared PostgreSQL database, currently with an active Discord bot and a planned web app that will both operate against the same data.
 
-> **Status: In Progress.** The Discord bot is the primary active module. The REST backend is now in early development. The frontend is planned but not yet started.
+> **Status: In Progress.** The Discord bot is the primary active module. The REST backend is active and provides Google Drive, S3, and Google Sheets integrations. The frontend is planned but not yet started.
 
 ---
 
@@ -30,6 +30,9 @@ The database schema models all of the following. Bot commands and web UI to expo
 | ✅ schema, ✅ db layer, ✅ bot | Contribution history — record who completed which task, for which chapter, and when |
 | ✅ bot | To-do lists — see which tasks are ready to start (dependencies satisfied), per user |
 | ✅ bot | Release summaries — query releases with sorting and filtering |
+| ✅ backend | Google Drive — list, upload, download, and delete files via REST API |
+| ✅ backend | S3-compatible storage — list, upload, download, and delete objects (AWS S3, Cloudflare R2, MinIO) |
+| ✅ backend + bot | Google Sheets sync — automatically push series and todo data to a Google Spreadsheet |
 
 ---
 
@@ -55,7 +58,7 @@ PostgreSQL 16 database, run via Docker Compose. Contains migration scripts that 
 
 ### backend/
 
-A Go REST API, currently in early development. Provides integrations for external storage services (Google Drive, S3-compatible storage) and will eventually expose the same scanlation data as the Discord bot over HTTP.
+A Go REST API providing external service integrations for the bot: Google Drive, S3-compatible storage (AWS S3, Cloudflare R2, MinIO), and Google Sheets sync. The Sheets sync service reads from the database and writes live progress data to a configured Google Spreadsheet.
 
 See [`backend/README.md`](backend/README.md) for setup and usage.
 
@@ -97,7 +100,7 @@ cd discord
 cp config.json.example config.json  # fill in your bot token etc.
 cmake --preset default
 cmake --build --preset default
-./build/scanlation-manager
+./build/debug/scanlation-manager
 ```
 
 See [`discord/README.md`](discord/README.md) for full details.

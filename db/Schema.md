@@ -138,7 +138,7 @@ Individual chapters belonging to a series.
 | `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
 | `volume` | `INT` | Yes | — | Volume number, if the series uses a volume structure. `NULL` = not part of a named volume (e.g. web release). Not unique — multiple chapters share the same volume. |
 | `number` | `NUMERIC(6,2)` | No | — | Sortable chapter number (e.g. `51`, `51.10`). Unique per series. |
-| `name` | `CITEXT` | No | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. |
+| `name` | `CITEXT` | Yes | — | Display name (e.g. `"Ch 51.1"`), case-insensitive. Unique per series. `NULL` for chapters identified by number only. |
 | `status` | `TEXT` | No | `'in_progress'` | See check constraint below |
 | `added_at` | `TIMESTAMPTZ` | No | `NOW()` | |
 | `closed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = still in progress |
@@ -160,6 +160,7 @@ Custom task types that must be completed before a chapter can be released (e.g. 
 |--------|------|----------|---------|-------|
 | `id` | `SERIAL` | No | — | PK |
 | `name` | `CITEXT` | No | — | Unique |
+| `level` | `INT` | Yes | — | Ordering field. Used to sort tasks in sheets and to prevent cyclic dependencies — a task may only depend on tasks with a strictly lower level. |
 | `retired_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = active. Set when the task has completion history and cannot be hard-deleted. |
 
 **Unique constraints:**
@@ -227,6 +228,7 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 | `user_id` | `INT` | No | — | FK → `users(id)` |
 | `chapter_id` | `INT` | No | — | FK → `chapters(id)` ON DELETE CASCADE |
 | `task_id` | `INT` | No | — | FK → `tasks(id)` |
+| `assigned_at` | `TIMESTAMPTZ` | No | `NOW()` | When the assignment was created; used to compute `days_active` in the Todo sheet |
 | `completed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = outstanding; non-null = done, value is the completion timestamp |
 
 **PK:** `(user_id, chapter_id, task_id)`
@@ -236,6 +238,40 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 
 **Triggers:**
 - `enforce_completed_assignment_immutable` — before DELETE, raises if `completed_at IS NOT NULL`. Completed rows are permanent historical records; only outstanding rows may be removed.
+
+---
+
+### `bot_settings`
+
+A simple key-value store for runtime bot configuration managed via Discord commands.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `key` | `TEXT` | No | — | PK |
+| `value` | `TEXT` | No | — | |
+
+**Current keys:**
+- `gsheet_enabled` — set to `"1"` when Google Sheets integration is active (managed via `/gsheet enable`/`disable`)
+
+---
+
+## Views
+
+### `outstanding_chapter_assignments`
+
+Returns all incomplete chapter assignments that are currently actionable — prerequisites satisfied, chapter `in_progress`, series `active`. Used by the Todo sheet backend and by the `/todo` Discord command (which applies equivalent logic in-memory).
+
+**Columns:** `series_name`, `chapter_number`, `chapter_name`, `chapter_volume`, `task_name`, `task_level`, `display_name`, `days_active`
+
+**`days_active` logic:**
+- `0` if any prerequisite task exists and has an outstanding assignment in the same chapter (task is blocked)
+- Otherwise: `FLOOR((NOW() - GREATEST(assigned_at, latest_prereq_completed_at)) / 86400)` — days since the task became workable
+
+**Filters applied:**
+- `chapter_assignments.completed_at IS NULL` — outstanding only
+- Prerequisite check passes — only assignments that exist and are complete count as satisfied (unassigned prerequisites are ignored)
+- `chapters.status = 'in_progress'`
+- `series.status = 'active'`
 
 ---
 

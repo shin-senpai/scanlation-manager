@@ -2,7 +2,7 @@
 
 > Part of the `scanlation-manager` monorepo. This module lives under `backend/`.
 
-A Go REST API providing external service integrations and (eventually) the full scanlation data API consumed by the frontend.
+A Go REST API providing external service integrations (Google Drive, S3-compatible storage, Google Sheets) for the scanlation manager Discord bot and (eventually) the full data API consumed by the frontend.
 
 ---
 
@@ -12,19 +12,27 @@ A Go REST API providing external service integrations and (eventually) the full 
 backend/
 ├── cmd/
 │   └── api/
-│       └── main.go          # Entry point — initializes services, starts server
+│       └── main.go               # Entry point — initializes services, starts server
 ├── internal/
 │   ├── config/
-│   │   └── config.go        # Loads config.json
+│   │   └── config.go             # Loads config.json
 │   ├── services/
 │   │   ├── gdrive/
-│   │   │   └── gdrive.go    # Google Drive client (list, download, upload, delete)
-│   │   └── s3/
-│   │       └── s3.go        # S3-compatible client (list, download, upload, delete)
+│   │   │   └── gdrive.go         # Google Drive client (list, download, upload, delete)
+│   │   ├── s3/
+│   │   │   └── s3.go             # S3-compatible client (list, download, upload, delete)
+│   │   ├── gsheets/
+│   │   │   └── gsheets.go        # Google Sheets client (ClearAndWrite, DeleteSheet, IsHealthy)
+│   │   ├── sheetdb/
+│   │   │   └── sheetdb.go        # PostgreSQL reader for sheet sync data
+│   │   └── mangadex/
+│   │       └── mangadex.go       # MangaDex API client — stub, not yet implemented
 │   └── handlers/
-│       ├── routes.go        # Route registration
-│       ├── gdrive.go        # Google Drive HTTP handlers
-│       └── s3.go            # S3 HTTP handlers
+│       ├── routes.go             # Route registration (conditional on enabled services)
+│       ├── api.go                # GET /health — liveness + auth check
+│       ├── gdrive.go             # Google Drive HTTP handlers
+│       ├── s3.go                 # S3 HTTP handlers
+│       └── sheets.go             # Google Sheets sync handlers + grid builders
 └── config.json.example
 ```
 
@@ -40,13 +48,16 @@ cp config.json.example config.json
 
 | Key | Required | Description |
 |-----|----------|-------------|
-| `port` | ❌ | Port to listen on (default: `8080`) |
-| `gdrive_credentials_file` | ❌ | Path to a Google service account JSON key file |
-| `s3_endpoint` | ❌ | S3-compatible endpoint URL (omit for AWS S3; for R2: `https://<account_id>.r2.cloudflarestorage.com`) |
-| `s3_region` | ❌ | Region (`auto` for R2, standard region for AWS) |
-| `s3_access_key_id` | ❌ | S3 access key ID |
-| `s3_secret_access_key` | ❌ | S3 secret access key |
-| `s3_bucket` | ❌ | S3 bucket name |
+| `port` | No (default `8080`) | Port to listen on |
+| `gdrive_credentials_file` | For Drive + Sheets | Path to a Google service account JSON key file |
+| `s3_endpoint` | For S3 | S3-compatible endpoint URL — omit for AWS S3; for R2: `https://<account_id>.r2.cloudflarestorage.com` |
+| `s3_region` | For S3 | Region (`auto` for R2, standard AWS region string otherwise) |
+| `s3_access_key_id` | For S3 | S3 access key ID |
+| `s3_secret_access_key` | For S3 | S3 secret access key |
+| `s3_bucket` | For S3 | S3 bucket name |
+| `gsheet_spreadsheet_id` | For Sheets | Google Spreadsheet ID (from the URL) |
+| `api_token` | For Sheets | Shared PSK — must match `api_token` in `discord/config.json` |
+| `db_connection_string` | For Sheets | libpq-style connection string for reading DB state, e.g. `host=localhost port=5432 dbname=scanlation_manager user=scanlation_manager password=secret` |
 
 All service keys are optional — the server starts without a service if its credentials are absent, and its routes are simply not registered.
 
@@ -67,11 +78,28 @@ go build -o bin/api ./cmd/api/
 ./bin/api
 ```
 
-Run the binary from `backend/` so it can find `config.json` in the working directory, or set `CONFIG_PATH` explicitly.
+Run from `backend/` so it finds `config.json` in the working directory, or set `CONFIG_PATH` explicitly.
 
 ---
 
 ## API
+
+All routes require `Authorization: Bearer <api_token>`.
+
+### Health
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Backend liveness + auth check — 200 if reachable and token is valid |
+
+### Google Sheets Sync
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/sheets/health` | Sheets API connectivity check |
+| `POST` | `/sheets/sync/todo` | Rewrites the `"Todo"` sheet tab from DB state |
+| `POST` | `/sheets/sync/series` | Body: `{"name":"..."}` — rewrites the named series sheet tab |
+| `POST` | `/sheets/delete-series` | Body: `{"name":"..."}` — deletes the named series sheet tab |
 
 ### Google Drive
 
@@ -97,5 +125,6 @@ Keys support slashes (e.g. `chapters/vol1/ch1.zip`).
 
 ## Dependencies
 
-- [`google.golang.org/api`](https://pkg.go.dev/google.golang.org/api) — Google Drive API client
+- [`google.golang.org/api`](https://pkg.go.dev/google.golang.org/api) — Google Drive v3 + Sheets v4 API clients
 - [`github.com/aws/aws-sdk-go-v2`](https://pkg.go.dev/github.com/aws/aws-sdk-go-v2) — AWS SDK for S3-compatible storage
+- [`github.com/jackc/pgx/v5`](https://pkg.go.dev/github.com/jackc/pgx/v5) — PostgreSQL client (pgxpool) for reading DB state during sheet sync

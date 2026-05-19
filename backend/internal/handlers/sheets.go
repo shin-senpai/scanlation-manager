@@ -95,6 +95,16 @@ func (h *sheetsHandler) syncSeries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	layout := gsheets.SeriesSheetLayout{
+		CrewCount:    len(data.Crew),
+		TaskCount:    len(data.Tasks),
+		ChapterCount: len(data.Chapters),
+	}
+	if err := h.sheets.FormatSeriesSheet(r.Context(), body.Name, layout); err != nil {
+		log.Printf("sheets/sync/series %q: format warning: %v", body.Name, err)
+		// non-fatal — data was written successfully
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -122,11 +132,15 @@ func (h *sheetsHandler) deleteSeries(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildTodoGrid builds the values grid for the Todo sheet.
+// The "Days Active" column is written as a Google Sheets formula so it recalculates
+// automatically every day without requiring a sync.
 func buildTodoGrid(rows []sheetdb.TodoRow) [][]interface{} {
 	values := make([][]interface{}, 0, len(rows)+1)
 	values = append(values, []interface{}{"Series", "Chapter", "Task", "Assigned To", "Days Active"})
 	for _, r := range rows {
-		values = append(values, []interface{}{r.Series, r.Chapter, r.Task, r.AssignedTo, r.DaysActive})
+		t := r.ActiveSince
+		daysFormula := fmt.Sprintf("=INT(TODAY()-DATE(%d,%d,%d))", t.Year(), int(t.Month()), t.Day())
+		values = append(values, []interface{}{r.Series, r.Chapter, r.Task, r.AssignedTo, daysFormula})
 	}
 	return values
 }

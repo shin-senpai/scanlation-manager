@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,19 +37,19 @@ func (c *Client) Close() {
 
 // TodoRow is one row in the Todo sheet.
 type TodoRow struct {
-	Series     string
-	Chapter    string
-	Task       string
-	AssignedTo string
-	DaysActive int
+	Series      string
+	Chapter     string
+	Task        string
+	AssignedTo  string
+	ActiveSince time.Time // when the task became actionable (assigned_at or latest prereq completion)
 }
 
 // GetTodoRows returns all incomplete assignments ordered by series, chapter number, task.
-// See migration 025_add_todo_sheet_view.sql for the days_active calculation logic.
+// See migration 027_add_active_since_to_todo_view.sql for the active_since calculation logic.
 func (c *Client) GetTodoRows(ctx context.Context) ([]TodoRow, error) {
 	const q = `
 		SELECT series_name, chapter_number, chapter_name, chapter_volume,
-		       task_name, display_name, days_active
+		       task_name, display_name, active_since
 		FROM outstanding_chapter_assignments
 		ORDER BY series_name, chapter_number, task_level NULLS LAST, task_name, display_name`
 
@@ -64,18 +65,18 @@ func (c *Client) GetTodoRows(ctx context.Context) ([]TodoRow, error) {
 		var number float64
 		var chapterName *string
 		var volume *int64
-		var daysActive int
+		var activeSince time.Time
 
-		if err := rows.Scan(&seriesName, &number, &chapterName, &volume, &taskName, &displayName, &daysActive); err != nil {
+		if err := rows.Scan(&seriesName, &number, &chapterName, &volume, &taskName, &displayName, &activeSince); err != nil {
 			return nil, fmt.Errorf("scan todo row: %w", err)
 		}
 
 		result = append(result, TodoRow{
-			Series:     seriesName,
-			Chapter:    formatChapterLabel(number, chapterName, volume),
-			Task:       taskName,
-			AssignedTo: displayName,
-			DaysActive: daysActive,
+			Series:      seriesName,
+			Chapter:     formatChapterLabel(number, chapterName, volume),
+			Task:        taskName,
+			AssignedTo:  displayName,
+			ActiveSince: activeSince,
 		})
 	}
 	return result, rows.Err()

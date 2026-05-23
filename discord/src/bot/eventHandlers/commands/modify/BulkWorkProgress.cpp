@@ -169,12 +169,12 @@ void Commands::bulkWorkProgress(Bot &bot, const dpp::slashcommand_t &event) {
     for(const auto &ch : valid_chapters) {
       assignments_repo.setCompleted(session.wtx(), resolved_user_id, ch.id, maybe_task->id);
       const auto dependents = task_deps_repo.findDependentAssignees(session.wtx(), ch.id, maybe_task->id);
-      if(dependents.empty()) {
+      for(const auto &[did, dep_task] : dependents) {
+        pings_by_task[dep_task].insert(did);
+      }
+      // Auto-release only when no incomplete assignments remain for this chapter
+      if(assignments_repo.listByChapter(session.wtx(), ch.id, std::nullopt, false).empty()) {
         chapters_to_release.push_back(ch.id);
-      } else {
-        for(const auto &[did, dep_task] : dependents) {
-          pings_by_task[dep_task].insert(did);
-        }
       }
     }
 

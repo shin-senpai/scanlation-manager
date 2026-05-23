@@ -127,17 +127,16 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
     std::string msg = "<@" + std::to_string(target_discord_id) + "> Marked **" + task_name + "** complete for **" + chapter_name + "** (" + series_name + ").";
 
     const auto dependents = task_deps_repo.findDependentAssignees(session.wtx(), maybe_chapter->id, maybe_task->id);
-    if(!dependents.empty()) {
-      std::map<std::string, std::string> task_pings;
-      for(const auto &[did, dep_task] : dependents) {
-        task_pings[dep_task] += "<@" + std::to_string(did) + "> ";
-      }
-      for(const auto &[dep_task, pings] : task_pings) {
-        msg += "\n" + pings + "— **" + task_name + "** is done, you can now proceed with **" + dep_task + "**.";
-      }
-    } else {
-      ChapterStatus cs = ChapterStatus::released;
-      chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, cs);
+    std::map<std::string, std::string> task_pings;
+    for(const auto &[did, dep_task] : dependents) {
+      task_pings[dep_task] += "<@" + std::to_string(did) + "> ";
+    }
+    for(const auto &[dep_task, pings] : task_pings) {
+      msg += "\n" + pings + "— **" + task_name + "** is done, you can now proceed with **" + dep_task + "**.";
+    }
+    // Auto-release only when no incomplete assignments remain for this chapter
+    if(assignments_repo.listByChapter(session.wtx(), maybe_chapter->id, std::nullopt, false).empty()) {
+      chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, ChapterStatus::released);
     }
     session.commit();
     SheetSync::syncSeries(bot, series_name);

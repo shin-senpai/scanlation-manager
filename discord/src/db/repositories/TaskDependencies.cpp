@@ -145,7 +145,13 @@ std::vector<std::pair<int64_t, std::string>> TaskDependenciesRepository::findDep
       " JOIN discord_identities di ON di.user_id = ca.user_id"
       " JOIN tasks t ON t.id = ca.task_id"
       " WHERE td.depends_on_task_id = $1 AND ca.chapter_id = $2"
-      " AND ca.completed_at IS NULL AND di.unlinked_at IS NULL",
+      " AND ca.completed_at IS NULL AND di.unlinked_at IS NULL"
+      " AND NOT EXISTS ("
+      "   SELECT 1 FROM task_dependencies td2"
+      "   JOIN chapter_assignments blocker ON blocker.task_id = td2.depends_on_task_id"
+      "     AND blocker.chapter_id = $2 AND blocker.completed_at IS NULL"
+      "   WHERE td2.task_id = ca.task_id"
+      " )",
       pqxx::params(txn, depends_on_task_id, chapter_id));
   std::vector<std::pair<int64_t, std::string>> assignees;
   assignees.reserve(result.size());

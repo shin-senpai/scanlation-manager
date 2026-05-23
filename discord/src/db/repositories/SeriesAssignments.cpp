@@ -79,6 +79,25 @@ std::vector<int> SeriesAssignmentsRepository::listDistinctSeriesByUser(pqxx::tra
   return series;
 }
 
+std::vector<std::string> SeriesAssignmentsRepository::listSeriesNamesByTask(pqxx::transaction_base &txn, int task_id) {
+  auto results = txn.exec(
+      "SELECT DISTINCT s.name FROM series s"
+      " WHERE s.id IN ("
+      "   SELECT series_id FROM series_assignments WHERE task_id = $1"
+      "   UNION"
+      "   SELECT c.series_id FROM chapter_assignments ca"
+      "   JOIN chapters c ON ca.chapter_id = c.id WHERE ca.task_id = $1"
+      " )",
+      pqxx::params(txn, task_id));
+
+  std::vector<std::string> names;
+  names.reserve(results.size());
+  for(const auto &row : results) {
+    names.emplace_back(row["name"].as<std::string>());
+  }
+  return names;
+}
+
 std::vector<CrewDetail> SeriesAssignmentsRepository::listBySeriesWithDetails(pqxx::transaction_base &txn, int series_id) {
   auto results = txn.exec(
       "SELECT t.name AS task_name, u.display_name AS user_display"

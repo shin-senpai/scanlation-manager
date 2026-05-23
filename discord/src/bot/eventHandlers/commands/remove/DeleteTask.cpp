@@ -3,9 +3,11 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
+#include "db/repositories/SeriesAssignments.hpp"
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
 #include "types/Permission.hpp"
@@ -29,6 +31,7 @@ void Commands::deleteTask(Bot &bot, const dpp::slashcommand_t &event) {
     UserRepository user_repo;
     TasksRepository tasks_repo;
     ChapterAssignmentsRepository chapter_assignments_repo;
+    SeriesAssignmentsRepository series_assignments_repo;
 
     const auto maybe_user_id = identity_repo.findUserIdByDiscordId(session.wtx(), discord_id);
     if(!maybe_user_id) {
@@ -56,9 +59,15 @@ void Commands::deleteTask(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
+    const auto affected_series = series_assignments_repo.listSeriesNamesByTask(session.wtx(), maybe_task->id);
     chapter_assignments_repo.removeOutstandingByTask(session.wtx(), maybe_task->id);
     tasks_repo.remove(session.wtx(), maybe_task->id);
     session.commit();
+
+    for(const auto &series_name : affected_series) {
+      SheetSync::syncSeries(bot, series_name);
+    }
+    SheetSync::syncTodo(bot);
 
     event.edit_original_response(dpp::message("Task **" + name + "** deleted."));
   } catch(const std::exception &e) {

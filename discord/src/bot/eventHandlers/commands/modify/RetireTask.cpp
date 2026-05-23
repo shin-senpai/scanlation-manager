@@ -3,6 +3,7 @@
 
 // User Defined Includes
 #include "bot/Bot.hpp"
+#include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
@@ -57,10 +58,16 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
+    const auto affected_series = series_assignments_repo.listSeriesNamesByTask(session.wtx(), maybe_task->id);
     series_assignments_repo.removeAllByTask(session.wtx(), maybe_task->id);
     chapter_assignments_repo.removeOutstandingByTask(session.wtx(), maybe_task->id);
     tasks_repo.retire(session.wtx(), maybe_task->id);
     session.commit();
+
+    for(const auto &series_name : affected_series) {
+      SheetSync::syncSeries(bot, series_name);
+    }
+    SheetSync::syncTodo(bot);
 
     event.edit_original_response(dpp::message("Task **" + name + "** retired. Completion history is preserved."));
   } catch(const std::exception &e) {

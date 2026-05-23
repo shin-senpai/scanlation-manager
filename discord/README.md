@@ -264,10 +264,10 @@ Removes a scanlation role from a user. Manager+.
 Deletes a role and cascades to all role-task mappings and user-role assignments. Manager+.
 
 ### `/delete-task [name]`
-Deletes a task. Only allowed if the task has no completed chapter assignments — use `/retire-task` instead if it does. Manager+.
+Deletes a task. Only allowed if the task has no completed chapter assignments — use `/retire-task` instead if it does. After deletion, fires a sheet sync for every series that had assignments for the task. Manager+.
 
 ### `/retire-task [name]`
-Soft-retires a task (sets `retired_at`). Retired tasks cannot be assigned but their completion history is preserved. Manager+.
+Soft-retires a task (sets `retired_at`). Removes all series-level and outstanding chapter assignments for the task, then syncs every affected series sheet. Completed assignment history is preserved. Retired tasks cannot be assigned. Manager+.
 
 ### `/unretire-task [name]`
 Restores a retired task to active status. Manager+.
@@ -301,8 +301,8 @@ Multi-subcommand for managing series. Manager+.
 
 - **`add [name]`** — Create a new series.
 - **`set-status [name] [status]`** — Update series status (`active`, `hiatus`, `completed`, `dropped`).
-- **`assign [name] [user] [task]`** — Add a user to the series' default crew for a task. The user must hold a role mapped to that task. New chapters added to this series will automatically inherit these assignments.
-- **`unassign [name] [user] [task]`** — Remove a user from the default crew.
+- **`assign [name] [user] [task] [sync_chapters?]`** — Add a user to the series' default crew for a task. The user must hold a role mapped to that task. New chapters automatically inherit these assignments. When `sync_chapters` is `true` (default), also adds the assignment to every existing non-released chapter in the series that the user isn't already assigned to.
+- **`unassign [name] [user] [task] [sync_chapters?]`** — Remove a user from the default crew. When `sync_chapters` is `true` (default), also removes their outstanding (not yet completed) chapter assignments across all non-released chapters in the series. Completed assignments are never removed.
 - **`remove [name]`** — Delete a series and all its chapters. Manager can remove series with no completed assignments; Supermanager can remove any (completed assignments are cleared first to bypass the immutability trigger).
 
 ### `/chapter`

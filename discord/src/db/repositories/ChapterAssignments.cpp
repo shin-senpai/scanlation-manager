@@ -189,6 +189,29 @@ bool ChapterAssignmentsRepository::exists(pqxx::transaction_base &txn, int user_
   return !result.empty();
 }
 
+int ChapterAssignmentsRepository::createForSeriesIfMissing(pqxx::transaction_base &txn, int user_id, int series_id, int task_id) {
+  auto result = txn.exec(
+      "INSERT INTO chapter_assignments (user_id, chapter_id, task_id)"
+      " SELECT $1, c.id, $3 FROM chapters c"
+      " WHERE c.series_id = $2 AND c.status != 'released'"
+      " AND NOT EXISTS ("
+      "   SELECT 1 FROM chapter_assignments ca"
+      "   WHERE ca.user_id = $1 AND ca.chapter_id = c.id AND ca.task_id = $3"
+      " )",
+      pqxx::params(txn, user_id, series_id, task_id));
+  return static_cast<int>(result.affected_rows());
+}
+
+int ChapterAssignmentsRepository::removeOutstandingForUserInSeries(pqxx::transaction_base &txn, int user_id, int series_id, int task_id) {
+  auto result = txn.exec(
+      "DELETE FROM chapter_assignments ca USING chapters c"
+      " WHERE ca.chapter_id = c.id"
+      " AND ca.user_id = $1 AND c.series_id = $2 AND ca.task_id = $3"
+      " AND ca.completed_at IS NULL AND c.status != 'released'",
+      pqxx::params(txn, user_id, series_id, task_id));
+  return static_cast<int>(result.affected_rows());
+}
+
 void ChapterAssignmentsRepository::setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id) {
   txn.exec(
       "UPDATE chapter_assignments SET completed_at = NOW() WHERE user_id = $1 AND chapter_id = $2 AND task_id = $3",

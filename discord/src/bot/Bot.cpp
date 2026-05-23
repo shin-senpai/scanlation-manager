@@ -160,11 +160,13 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_sub_command, "assign", "Add a user to this series' default crew")
               .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_user, "user", "User to assign", true))
-              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also assign to existing in-progress chapters (default: true)", false)),
           dpp::command_option(dpp::co_sub_command, "unassign", "Remove a user from this series' default crew")
               .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_user, "user", "User to unassign", true))
-              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also remove from existing in-progress chapters (default: true)", false)),
           dpp::command_option(dpp::co_sub_command, "remove", "Delete a series and all its chapters")
               .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true)),
       },

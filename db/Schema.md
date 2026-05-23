@@ -228,7 +228,7 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 | `user_id` | `INT` | No | — | FK → `users(id)` |
 | `chapter_id` | `INT` | No | — | FK → `chapters(id)` ON DELETE CASCADE |
 | `task_id` | `INT` | No | — | FK → `tasks(id)` |
-| `assigned_at` | `TIMESTAMPTZ` | No | `NOW()` | When the assignment was created; used to compute `days_active` in the Todo sheet |
+| `assigned_at` | `TIMESTAMPTZ` | No | `NOW()` | When the assignment was created; used to compute `active_since` in the Todo sheet view |
 | `completed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = outstanding; non-null = done, value is the completion timestamp |
 
 **PK:** `(user_id, chapter_id, task_id)`
@@ -261,11 +261,9 @@ A simple key-value store for runtime bot configuration managed via Discord comma
 
 Returns all incomplete chapter assignments that are currently actionable — prerequisites satisfied, chapter `in_progress`, series `active`. Used by the Todo sheet backend and by the `/todo` Discord command (which applies equivalent logic in-memory).
 
-**Columns:** `series_name`, `chapter_number`, `chapter_name`, `chapter_volume`, `task_name`, `task_level`, `display_name`, `days_active`
+**Columns:** `series_name`, `chapter_number`, `chapter_name`, `chapter_volume`, `task_name`, `task_level`, `display_name`, `active_since`
 
-**`days_active` logic:**
-- `0` if any prerequisite task exists and has an outstanding assignment in the same chapter (task is blocked)
-- Otherwise: `FLOOR((NOW() - GREATEST(assigned_at, latest_prereq_completed_at)) / 86400)` — days since the task became workable
+**`active_since`:** `GREATEST(assigned_at, latest_prereq_completed_at)` — the timestamp from which the task has been workable. The Go backend writes this into the Todo sheet as a `=INT(TODAY()-DATE(...))` formula so the Days Active cell recalculates live without requiring a sync.
 
 **Filters applied:**
 - `chapter_assignments.completed_at IS NULL` — outstanding only

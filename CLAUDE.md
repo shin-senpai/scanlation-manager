@@ -120,8 +120,8 @@ Call placement after `session.commit()`:
 |---------|-----------|
 | `/series add` | `syncSeries` |
 | `/series set-status` | `syncSeries` + `syncTodo` |
-| `/series assign` | `syncSeries` |
-| `/series unassign` | `syncSeries` |
+| `/series assign` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
+| `/series unassign` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
 | `/series remove` | `deleteSeries` + `syncTodo` |
 | `/chapter add` | `syncSeries` + `syncTodo` |
 | `/chapter set-status` | `syncSeries` + `syncTodo` |
@@ -130,6 +130,8 @@ Call placement after `session.commit()`:
 | `/chapter uncomplete` | `syncSeries` + `syncTodo` |
 | `/chapter remove` | `syncSeries` + `syncTodo` |
 | `/work-update` | `syncSeries` + `syncTodo` |
+| `/delete-task` | `syncSeries` (all affected series) + `syncTodo` |
+| `/retire-task` | `syncSeries` (all affected series) + `syncTodo` |
 
 ### libcurl Usage Notes
 - `CurlGlobalManager::curlManagerInit()` must be called once at startup (done in `main.cpp`) before any `httpGet`/`httpPost`
@@ -193,6 +195,7 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 024_add_bot_settings.sql                      — bot_settings (key TEXT PK, value TEXT) — runtime key-value config
 025_add_todo_sheet_view.sql                   — outstanding_chapter_assignments VIEW: prerequisite-aware days_active
 026_update_todo_sheet_view.sql                — Replaces view: adds pc.available, c.status='in_progress', s.status='active' filters
+027_add_active_since_to_todo_view.sql         — Replaces view: swaps days_active (stale int) for active_since (TIMESTAMPTZ) so Days Active can be a live formula in the sheet
 ```
 
 ### Key Schema Notes
@@ -200,7 +203,7 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 - Every user must have either a `name` (webapp) or an active row in `discord_identities` — enforced by constraint triggers
 - At least one supermanager (`permission_level = 2`) among active users must always exist — enforced by a constraint trigger
 - `chapter_assignments.completed_at` is both the "done" flag and the completion timestamp — `NULL` = outstanding, non-null = done
-- `chapter_assignments.assigned_at` records when the assignment was created; used by `outstanding_chapter_assignments` to compute `days_active`
+- `chapter_assignments.assigned_at` records when the assignment was created; used by `outstanding_chapter_assignments` to compute `active_since` (the timestamp from which Days Active counts)
 - Tasks can be hard-deleted only if they have no completed `chapter_assignments`; otherwise use `tasks.retired_at` (soft-delete)
 - Deleting a role or task cascades to junction tables (`role_tasks`, `user_roles`, `series_assignments`, `task_dependencies`) via `ON DELETE CASCADE`; `chapter_assignments` is intentionally excluded from cascade to preserve history
 - Deleting a series or chapter cascades to child records; completed assignments must be cleared before deletion (the application handles this in the supermanager path before calling `remove()`)
@@ -291,7 +294,7 @@ All routes require `Authorization: Bearer <api_token>`.
 **Todo sheet** (tab name: `"Todo"`):
 - Columns: `Series | Chapter | Task | Assigned To | Days Active`
 - One row per actionable incomplete assignment (prerequisites met, chapter `in_progress`, series `active`)
-- `Days Active` = 0 if task is blocked by unmet prerequisites; else floor of days since `GREATEST(assigned_at, latest_prereq_completion)`
+- `Days Active` is written as a Google Sheets formula `=INT(TODAY()-DATE(Y,M,D))` where the date is `GREATEST(assigned_at, latest_prereq_completion)` fetched from the DB — the cell recalculates live every day without a sync
 - Sorted: series name → chapter number → task level (NULLS LAST) → task name → assignee
 
 **Series sheet** (one tab per series, tab named after the series):
@@ -365,10 +368,10 @@ Add command. Syncs all members of a Discord role into the matching app role. Req
 Add command. Creates a task. Name is normalised to uppercase. `level` is an integer used to order tasks in sheets and prevent cyclic dependencies. Requires manager+.
 
 ### /delete-task \<task\>
-Remove command. Hard-deletes the task. Fails if any completed `chapter_assignments` exist for this task — use `/retire-task` instead. Cascades to `role_tasks`, `task_dependencies`, outstanding `chapter_assignments`, and `series_assignments`. Requires manager+.
+Remove command. Hard-deletes the task. Fails if any completed `chapter_assignments` exist for this task — use `/retire-task` instead. Cascades to `role_tasks`, `task_dependencies`, outstanding `chapter_assignments`, and `series_assignments`. Fires `syncSeries` for all series that had assignments for the task, plus `syncTodo`. Requires manager+.
 
 ### /retire-task \<task\>
-Modify command. Soft-deletes the task (sets `retired_at`). Retired tasks cannot be assigned. Requires manager+.
+Modify command. Soft-deletes the task (sets `retired_at`). Removes all series-level and outstanding chapter-level assignments for the task. Fires `syncSeries` for all affected series, plus `syncTodo`. Retired tasks cannot be assigned. Requires manager+.
 
 ### /unretire-task \<task\>
 Modify command. Clears `retired_at` on the task. Requires manager+.
@@ -419,8 +422,8 @@ Manage command. Requires manager+.
 |-----------|-------------|
 | `add <name>` | Creates the series; fires `syncSeries` |
 | `set-status <name> <status>` | Updates status (`active`/`completed`/`hiatus`/`dropped`); fires `syncSeries` + `syncTodo` |
-| `assign <name> <user> <task>` | Adds a series-level crew assignment (validates user has a capable role); fires `syncSeries` |
-| `unassign <name> <user> <task>` | Removes a series-level crew assignment; fires `syncSeries` |
+| `assign <name> <user> <task> [sync_chapters]` | Adds a series-level crew assignment (validates user has a capable role). When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them. Fires `syncSeries` + `syncTodo` (if synced). |
+| `unassign <name> <user> <task> [sync_chapters]` | Removes a series-level crew assignment. When `sync_chapters` is true (default), also removes outstanding (not completed) chapter assignments for that user+task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 | `remove <name>` | Deletes the series and all chapters. If completed assignments exist, requires supermanager (clears `completed_at` first to bypass immutability trigger); fires `deleteSeries` + `syncTodo` |
 
 ### /chapter \<subcommand\>
@@ -439,7 +442,7 @@ Manage command. Requires manager+.
 Modify command. Marks a chapter assignment complete for the calling user (or a target user, if manager+).
 - Checks that the assignment exists and is not already completed
 - Checks that all task dependencies are satisfied for this chapter
-- If dependents exist: pings their assignees in the response
+- If dependents exist: pings assignees of tasks that are now **fully unblocked** (all their dependencies complete) — tasks still blocked by other prerequisites are not pinged
 - If no dependents remain: auto-sets the chapter status to `released`
 - Fires `syncSeries` + `syncTodo`
 

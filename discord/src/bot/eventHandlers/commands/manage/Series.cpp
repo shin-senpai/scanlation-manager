@@ -67,6 +67,7 @@ void doSetStatus(Bot &bot, const dpp::slashcommand_t &event, DbSession &session)
 void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   SeriesAssignmentsRepository assignments_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
   TasksRepository tasks_repo;
   RoleTasksRepository role_tasks_repo;
   DiscordIdentityRepository identity_repo;
@@ -113,12 +114,31 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
+  bool sync_chapters = true;
+  const auto sync_param = event.get_parameter("sync_chapters");
+  if(const auto *b = std::get_if<bool>(&sync_param)) {
+    sync_chapters = *b;
+  }
+
   try {
     assignments_repo.create(session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+    int chapters_affected = 0;
+    if(sync_chapters) {
+      chapters_affected = chapter_assignments_repo.createForSeriesIfMissing(
+          session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+    }
     session.commit();
     SheetSync::syncSeries(bot, series_name);
-    event.edit_original_response(dpp::message(
-        "<@" + std::to_string(target_discord_id) + "> assigned to **" + series_name + "** for **" + task_name + "**."));
+    if(sync_chapters) {
+      SheetSync::syncTodo(bot);
+    }
+    std::string msg = "<@" + std::to_string(target_discord_id) + "> assigned to **" + series_name + "** for **" + task_name + "**.";
+    if(sync_chapters) {
+      msg += chapters_affected > 0
+                 ? "\n(Synced to " + std::to_string(chapters_affected) + " existing chapter(s).)"
+                 : "\n(No existing chapters to sync.)";
+    }
+    event.edit_original_response(dpp::message(msg));
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("That user is already assigned to that series for that task."));
   }
@@ -127,6 +147,7 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
 void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   SeriesAssignmentsRepository assignments_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
   TasksRepository tasks_repo;
   DiscordIdentityRepository identity_repo;
 
@@ -157,12 +178,31 @@ void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) 
     return;
   }
 
+  bool sync_chapters = true;
+  const auto sync_param = event.get_parameter("sync_chapters");
+  if(const auto *b = std::get_if<bool>(&sync_param)) {
+    sync_chapters = *b;
+  }
+
   assignments_repo.remove(session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+  int chapters_affected = 0;
+  if(sync_chapters) {
+    chapters_affected = chapter_assignments_repo.removeOutstandingForUserInSeries(
+        session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+  }
   session.commit();
   SheetSync::syncSeries(bot, series_name);
+  if(sync_chapters) {
+    SheetSync::syncTodo(bot);
+  }
 
-  event.edit_original_response(dpp::message(
-      "<@" + std::to_string(target_discord_id) + "> removed from **" + series_name + "** for **" + task_name + "**."));
+  std::string msg = "<@" + std::to_string(target_discord_id) + "> removed from **" + series_name + "** for **" + task_name + "**.";
+  if(sync_chapters) {
+    msg += chapters_affected > 0
+               ? "\n(Removed from " + std::to_string(chapters_affected) + " existing chapter(s); completed assignments preserved.)"
+               : "\n(No outstanding chapter assignments to remove.)";
+  }
+  event.edit_original_response(dpp::message(msg));
 }
 
 void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {

@@ -44,6 +44,14 @@ public:
 
   std::vector<int> listDistinctSeriesByUser(pqxx::transaction_base &txn, int user_id, std::optional<bool> completed);
 
+  // Inserts assignments for every non-released chapter in the series where the user
+  // doesn't already have one. Returns the number of chapters affected.
+  int createForSeriesIfMissing(pqxx::transaction_base &txn, int user_id, int series_id, int task_id);
+
+  // Deletes outstanding (not yet completed) assignments for user+task across all
+  // non-released chapters in the series. Returns the number of chapters affected.
+  int removeOutstandingForUserInSeries(pqxx::transaction_base &txn, int user_id, int series_id, int task_id);
+
   void setCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);
 
   void clearCompleted(pqxx::transaction_base &txn, int user_id, int chapter_id, int task_id);

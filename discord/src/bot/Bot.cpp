@@ -51,6 +51,7 @@
 #include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
+#include "bot/eventHandlers/commands/modify/BulkWorkProgress.hpp"
 #include "bot/eventHandlers/commands/modify/WorkProgress.hpp"
 #include "bot/eventHandlers/commands/remove/DeleteRole.hpp"
 #include "bot/eventHandlers/commands/remove/DeleteTask.hpp"
@@ -82,6 +83,17 @@ void Bot::fillCommandMap() {
        dpp::command_option(dpp::co_user, "user", "Optional user specifier (manager+ only, defaults to yourself)", false)},
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::workProgressAutocomplete(*this, key, input, e);
+      }};
+
+  m_commands["bulk-work-update"] = {
+      "Mark your progress on a task across multiple chapters at once",
+      [this](const dpp::slashcommand_t &e) { Commands::bulkWorkProgress(*this, e); },
+      {dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true),
+       dpp::command_option(dpp::co_string, "task", "Task to mark complete", true).set_auto_complete(true),
+       dpp::command_option(dpp::co_string, "chapters", "Chapter numbers (e.g. 51,52,53.5)", true),
+       dpp::command_option(dpp::co_user, "user", "Optional user (manager+ only, defaults to yourself)", false)},
+      [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
+        Commands::bulkWorkProgressAutocomplete(*this, key, input, e);
       }};
 
   m_commands["register"] = {
@@ -209,6 +221,9 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_sub_command, "remove", "Delete a chapter and all its assignments")
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "bulk-add", "Add multiple chapters to a series at once")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapters", "Chapter numbers (e.g. 51,52,53.5)", true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::chapterAutocomplete(*this, key, input, e);

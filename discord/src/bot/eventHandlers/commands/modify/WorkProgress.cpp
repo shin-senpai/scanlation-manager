@@ -42,7 +42,7 @@ std::string fmtChapterNumber(double n) {
 } // namespace
 
 void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
-  event.thinking(false);
+  event.thinking(true);
   const int64_t discord_id = static_cast<int64_t>(event.command.usr.id);
 
   try {

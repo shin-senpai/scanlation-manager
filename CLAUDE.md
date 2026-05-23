@@ -437,6 +437,7 @@ Manage command. Requires manager+.
 | `unassign <series> <chapter> <user> <task>` | Removes outstanding assignment (blocked if already completed); fires `syncSeries` + `syncTodo` |
 | `uncomplete <series> <chapter> <user> <task>` | Clears `completed_at` on a completed assignment (chapter must be `in_progress`); fires `syncSeries` + `syncTodo` |
 | `remove <series> <chapter>` | Deletes the chapter. Requires supermanager if completed assignments exist; fires `syncSeries` + `syncTodo` |
+| `bulk-add <series> <chapters>` | Adds multiple chapters at once; `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`); copies series-level crew to each; skips numbers that already exist; fires `syncSeries` + `syncTodo` if any chapter was created |
 
 ### /work-update \<series\> \<chapter\> \<task\> [user]
 Modify command. Marks a chapter assignment complete for the calling user (or a target user, if manager+).
@@ -444,6 +445,12 @@ Modify command. Marks a chapter assignment complete for the calling user (or a t
 - Checks that all task dependencies are satisfied for this chapter
 - If dependents exist: pings assignees of tasks that are now **fully unblocked** (all their dependencies complete) — tasks still blocked by other prerequisites are not pinged
 - If no dependents remain: auto-sets the chapter status to `released`
+- Fires `syncSeries` + `syncTodo`
+
+### /bulk-work-update \<series\> \<task\> \<chapters\> [user]
+Modify command. Marks a task complete across multiple chapters in one command. `chapters` is a comma-separated list of chapter numbers (e.g. `51,52,53.5`). Input is normalized and validated before any DB write.
+- All chapters are validated first (exists, assigned, not already complete, no blocking dependencies) — if any fail the entire command is aborted with a per-chapter error report
+- On success: marks all complete, pings assignees of tasks now fully unblocked (deduplicated across chapters), auto-releases chapters with no remaining dependents
 - Fires `syncSeries` + `syncTodo`
 
 ### /gsheet \<enable|disable\>
@@ -495,8 +502,9 @@ Currently parses and echoes the parsed fields back. No DB write yet.
 | `/todo` | Done |
 | `/user-history` | Done |
 | `/work-update` | Done |
+| `/bulk-work-update` | Done |
 | `/series` (add, set-status, assign, unassign, remove) | Done |
-| `/chapter` (add, set-status, assign, unassign, uncomplete, remove) | Done |
+| `/chapter` (add, set-status, assign, unassign, uncomplete, remove, bulk-add) | Done |
 | `/gsheet` (enable, disable) | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | MangaDex integration (backend) | Stub only — not started |

@@ -45,13 +45,14 @@ scanlation-manager/
 | ✅ | `/list-role-tasks` — List all role-task mappings |
 | ✅ | `/list-task-deps` — Show the prerequisite graph for a task |
 | ✅ | `/series` — Manage series: add, set-status, assign/unassign default crew, remove |
-| ✅ | `/chapter` — Manage chapters: add, set-status, assign/unassign/uncomplete/remove |
+| ✅ | `/chapter` — Manage chapters: add, bulk-add, set-status, assign/unassign/uncomplete/remove |
 | ✅ | `/list-series` — List series with chapter counts and latest activity, optional status filter |
 | ✅ | `/list-chapters` — List chapters with task completion stats, optional series/status/sort |
 | ✅ | `/info` — Deep-dive view for a series (crew + chapters), chapter (assignments), or user profile |
 | ✅ | `/promote` — Promote a user to the next permission level |
 | ✅ | `/demote` — Demote a user to the previous permission level |
 | ✅ | `/work-update` — Mark a chapter task as complete; blocks on unmet dependencies, pings downstream assignees |
+| ✅ | `/bulk-work-update` — Mark a task complete across multiple chapters at once; same dependency/auto-release logic as `/work-update` |
 | ✅ | `/todo` — Show outstanding tasks that are ready to start (dependencies satisfied) |
 | ✅ | `/user-history` — Paginated log of all completed assignments, newest first, optionally filtered by series |
 | ✅ | `/gsheet` — Enable or disable Google Sheets sync (supermanager only) |
@@ -71,7 +72,7 @@ discord/
 │       ├── eventHandlers/
 │       │   ├── commands/
 │       │   │   ├── add/       # /register, /add-role, /add-task, /sync-role, /map-role-task, /set-task-dependency
-│       │   │   ├── modify/    # /work-update, /set-alias, /set-progress-channel, /set-staff-role, /promote, /demote, /assign-role, /retire-task, /unretire-task, /remove-role
+│       │   │   ├── modify/    # /work-update, /bulk-work-update, /set-alias, /set-progress-channel, /set-staff-role, /promote, /demote, /assign-role, /retire-task, /unretire-task, /remove-role
 │       │   │   ├── list/      # /ping, /info, /list-*, /todo, /user-history
 │       │   │   ├── remove/    # /delete-role, /delete-task, /unmap-role-task, /remove-task-dep
 │       │   │   └── manage/    # /series, /chapter, /gsheet
@@ -187,6 +188,7 @@ The first user to run `/register` is automatically granted Supermanager.
 | `/register [user]` | Manager |
 | `/set-alias` | Standard (registered) |
 | `/work-update` | Standard (registered) |
+| `/bulk-work-update` | Standard (registered; manager+ to mark for another user) |
 | `/todo` (self) | Standard (registered) |
 | `/todo [user]` | Manager |
 | `/user-history` (self) | Standard (registered) |
@@ -314,6 +316,7 @@ Multi-subcommand for managing chapters. Manager+.
 - **`unassign [series] [chapter] [user] [task]`** — Remove an outstanding assignment. Cannot remove a completed assignment — use `uncomplete` first.
 - **`uncomplete [series] [chapter] [user] [task]`** — Mark a completed assignment as outstanding again. Only allowed when the chapter status is `in_progress`.
 - **`remove [series] [chapter]`** — Delete a chapter and all its assignments. Manager can remove chapters with no completed assignments; Supermanager can remove any.
+- **`bulk-add [series] [chapters]`** — Add multiple chapters at once. `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`). Input is normalized and validated. Each new chapter inherits the series' default crew. Numbers that already exist are skipped and reported.
 
 All name fields support autocomplete.
 
@@ -351,6 +354,14 @@ Marks a chapter task assignment as complete. All fields support autocomplete —
 - **Dependency checking:** Blocks until all prerequisite tasks for that chapter are complete.
 - **Downstream pings:** Mentions all users whose tasks were unblocked by this completion.
 - **Auto-release:** If no dependents exist (this was the last task), the chapter status is automatically set to `released`.
+
+### `/bulk-work-update [series] [task] [chapters] [user?]`
+Marks a task complete across multiple chapters in a single command. `chapters` is a comma-separated list of chapter numbers (e.g. `51,52,53.5`). Input is normalized and validated. Autocomplete is available for `series` and `task`; `task` is filtered to incomplete assignments in the selected series.
+
+- **`user`** (manager+) — Mark complete on behalf of another user.
+- **Validate-then-execute:** All chapters are checked first — any error (not found, not assigned, already complete, dependency blocked) aborts the entire command with a per-chapter report.
+- **Downstream pings:** Mentions users whose tasks became fully unblocked, deduplicated across all chapters.
+- **Auto-release:** Chapters with no remaining dependents are automatically set to `released`.
 
 ### `/todo [user?]`
 Shows all outstanding task assignments that are ready to start (prerequisites satisfied), grouped by series and chapter.

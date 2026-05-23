@@ -18,12 +18,16 @@
 #include "types/ChapterStatus.hpp"
 #include "types/Permission.hpp"
 
+// User Defined Utils
+#include "bot/utils/ParseChapterNumbers.hpp"
+
 // Standard Includes
 #include <cmath>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
+#include <vector>
 
 // Third Party Includes
 #include <dpp/appcommand.h>
@@ -84,7 +88,7 @@ void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     SheetSync::syncSeries(bot, series_name);
     SheetSync::syncTodo(bot);
     const std::string display = name ? "**" + *name + "**" : "**Ch." + fmtChapterNumber(number) + "**";
-    event.edit_original_response(dpp::message("Chapter " + display + " added to **" + series_name + "** with ID `" + std::to_string(chapter_id) + "`." ));
+    event.edit_original_response(dpp::message("Chapter " + display + " added to **" + series_name + "** with ID `" + std::to_string(chapter_id) + "`."));
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("A chapter with that number or name already exists in **" + series_name + "**."));
   }
@@ -341,6 +345,77 @@ void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Pe
       "Chapter **" + chapter_name + "** deleted from **" + series_name + "**."));
 }
 
+void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  ChaptersRepository chapters_repo;
+  SeriesAssignmentsRepository series_assignments_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+  const std::string chapters_input = std::get<std::string>(event.get_parameter("chapters"));
+
+  std::string parse_error;
+  const auto chapter_numbers = BotUtils::parseChapterNumbers(chapters_input, parse_error);
+  if(chapter_numbers.empty()) {
+    event.edit_original_response(dpp::message(parse_error));
+    return;
+  }
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto default_assignments = series_assignments_repo.listBySeries(session.wtx(), maybe_series->id);
+
+  std::vector<double> created_nums;
+  std::vector<double> skipped_nums;
+
+  for(const double num : chapter_numbers) {
+    if(chapters_repo.findByNumber(session.wtx(), maybe_series->id, num)) {
+      skipped_nums.push_back(num);
+      continue;
+    }
+    const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, num);
+    for(const auto &assignment : default_assignments) {
+      chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
+    }
+    created_nums.push_back(num);
+  }
+
+  if(!created_nums.empty()) {
+    session.commit();
+    SheetSync::syncSeries(bot, series_name);
+    SheetSync::syncTodo(bot);
+  }
+
+  std::string msg;
+  if(!created_nums.empty()) {
+    std::string list;
+    for(size_t i = 0; i < created_nums.size(); ++i) {
+      if(i > 0) {
+        list += ", ";
+}
+      list += "Ch." + fmtChapterNumber(created_nums[i]);
+    }
+    msg += "Added " + std::to_string(created_nums.size()) + " chapter(s) to **" + series_name + "**: " + list + ".";
+  } else {
+    msg += "No new chapters added.";
+  }
+  if(!skipped_nums.empty()) {
+    std::string skip_list;
+    for(size_t i = 0; i < skipped_nums.size(); ++i) {
+      if(i > 0) {
+        skip_list += ", ";
+}
+      skip_list += "Ch." + fmtChapterNumber(skipped_nums[i]);
+    }
+    msg += "\nSkipped (already exist): " + skip_list + ".";
+  }
+  event.edit_original_response(dpp::message(msg));
+}
+
 } // namespace
 
 void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
@@ -382,6 +457,8 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       doUncomplete(bot, event, session);
     } else if(sub == "remove") {
       doRemove(bot, event, session, user_perm);
+    } else if(sub == "bulk-add") {
+      doBulkAdd(bot, event, session);
     }
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
@@ -402,7 +479,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
     const std::string lower_input = to_lower(input);
 
     // Series name options
-    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series") {
+    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series" || key == "bulk-add/series") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {

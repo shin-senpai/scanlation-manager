@@ -133,9 +133,21 @@ type SeriesSheetLayout struct {
 // a frozen first column; colour-coded chapter Status cells; and green/grey backgrounds
 // on completed/unassigned task cells.
 func (c *Client) FormatSeriesSheet(ctx context.Context, name string, l SeriesSheetLayout) error {
-	sheetID, err := c.getSheetID(ctx, name)
+	// Fetch sheet ID and existing conditional format rule count in one call so we
+	// can delete stale rules before adding fresh ones.
+	sp, err := c.srv.Spreadsheets.Get(c.spreadsheetID).Context(ctx).
+		Fields("sheets(properties(sheetId,title),conditionalFormats)").Do()
 	if err != nil {
-		return err
+		return fmt.Errorf("get spreadsheet metadata: %w", err)
+	}
+	sheetID := int64(-1)
+	var cfRuleCount int
+	for _, sh := range sp.Sheets {
+		if sh.Properties.Title == name {
+			sheetID = sh.Properties.SheetId
+			cfRuleCount = len(sh.ConditionalFormats)
+			break
+		}
 	}
 	if sheetID < 0 {
 		return fmt.Errorf("sheet %q not found", name)
@@ -161,6 +173,29 @@ func (c *Client) FormatSeriesSheet(ctx context.Context, name string, l SeriesShe
 	headerFields := "userEnteredFormat(backgroundColor,textFormat)"
 
 	var reqs []*sheets.Request
+
+	// (0a) Delete all existing conditional format rules (reverse order preserves indices).
+	for i := cfRuleCount - 1; i >= 0; i-- {
+		reqs = append(reqs, &sheets.Request{
+			DeleteConditionalFormatRule: &sheets.DeleteConditionalFormatRuleRequest{
+				SheetId: sheetID,
+				Index:   int64(i),
+			},
+		})
+	}
+
+	// (0b) Wipe all user-entered cell formatting on the entire sheet so stale
+	// formatting from previous layouts (different crew/chapter counts) doesn't persist.
+	// Omitting EndRowIndex/EndColumnIndex means unbounded — the whole sheet.
+	reqs = append(reqs, &sheets.Request{
+		RepeatCell: &sheets.RepeatCellRequest{
+			Range: &sheets.GridRange{
+				SheetId: sheetID,
+			},
+			Cell:   &sheets.CellData{UserEnteredFormat: &sheets.CellFormat{}},
+			Fields: "userEnteredFormat",
+		},
+	})
 
 	// (a) Status row header (row 0, cols 0–1)
 	reqs = append(reqs, repeatCell(sheetID, 0, 1, 0, 2, headerFmt, headerFields))

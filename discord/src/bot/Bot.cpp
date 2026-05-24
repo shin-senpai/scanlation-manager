@@ -187,6 +187,14 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_user, "to_user", "User to move assignment to", true))
               .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also move outstanding chapter assignments (default: true)", false)),
+          dpp::command_option(dpp::co_sub_command, "add-placeholder", "Add an unfilled vacancy for a task on this series")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also add placeholder to existing in-progress chapters (default: true)", false)),
+          dpp::command_option(dpp::co_sub_command, "remove-placeholder", "Remove all unfilled vacancies for a task on this series")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also remove chapter-level placeholders for this task (default: true)", false)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::seriesAutocomplete(*this, key, input, e);
@@ -235,6 +243,14 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_user, "from_user", "User to move assignment from", true))
               .add_option(dpp::command_option(dpp::co_user, "to_user", "User to move assignment to", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "add-placeholder", "Add an unfilled vacancy for a task on a chapter")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "remove-placeholder", "Remove all unfilled vacancies for a task on a chapter")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {

@@ -111,11 +111,13 @@ type ChapterRow struct {
 
 // SeriesSheetData holds everything needed to render a series sheet.
 type SeriesSheetData struct {
-	Status      string
-	Crew        []CrewEntry
-	Tasks       []TaskColumn
-	Chapters    []ChapterRow
-	Assignments map[int]map[int][]AssignmentEntry // [chapterID][taskID]
+	Status           string
+	Crew             []CrewEntry
+	CrewPlaceholders []CrewEntry               // TBD rows for series-level placeholder slots
+	Tasks            []TaskColumn
+	Chapters         []ChapterRow
+	Assignments      map[int]map[int][]AssignmentEntry // [chapterID][taskID]
+	Placeholders     map[int]map[int]int               // [chapterID][taskID] = count of unfilled vacancies
 }
 
 // GetSeriesSheetData fetches all data needed to render the series sheet for the given series name.
@@ -142,8 +144,9 @@ func (c *Client) GetSeriesSheetData(ctx context.Context, seriesName string) (*Se
 	}
 
 	data := &SeriesSheetData{
-		Status:      seriesStatus,
-		Assignments: make(map[int]map[int][]AssignmentEntry),
+		Status:       seriesStatus,
+		Assignments:  make(map[int]map[int][]AssignmentEntry),
+		Placeholders: make(map[int]map[int]int),
 	}
 
 	// 1. Crew (series-level assignments)
@@ -169,13 +172,47 @@ func (c *Client) GetSeriesSheetData(ctx context.Context, seriesName string) (*Se
 		return nil, err
 	}
 
-	// 2. Task columns (all tasks with at least one assignment in any chapter of this series)
+	// 1b. Series-level crew placeholders — one TBD entry per placeholder row
+	sapRows, err := c.pool.Query(ctx, `
+		SELECT t.name, COUNT(*) AS cnt
+		FROM series_assignment_placeholders sap
+		JOIN tasks t ON sap.task_id = t.id
+		WHERE sap.series_id = $1
+		GROUP BY t.id, t.name, t.level
+		ORDER BY t.level NULLS LAST, t.name`, seriesID)
+	if err != nil {
+		return nil, fmt.Errorf("query crew placeholders: %w", err)
+	}
+	defer sapRows.Close()
+	for sapRows.Next() {
+		var taskName string
+		var cnt int
+		if err := sapRows.Scan(&taskName, &cnt); err != nil {
+			return nil, fmt.Errorf("scan crew placeholder: %w", err)
+		}
+		for i := 0; i < cnt; i++ {
+			data.CrewPlaceholders = append(data.CrewPlaceholders, CrewEntry{UserName: "TBD", TaskName: taskName})
+		}
+	}
+	if err := sapRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 2. Task columns (all tasks with at least one assignment or placeholder in any chapter
+	//    of this series, or a series-level placeholder for this series)
 	taskRows, err := c.pool.Query(ctx, `
 		SELECT DISTINCT t.id, t.name, t.level
-		FROM chapter_assignments ca
-		JOIN chapters c ON ca.chapter_id = c.id
-		JOIN tasks t ON ca.task_id = t.id
-		WHERE c.series_id = $1
+		FROM (
+			SELECT ca.task_id FROM chapter_assignments ca
+			JOIN chapters c ON ca.chapter_id = c.id WHERE c.series_id = $1
+			UNION
+			SELECT cap.task_id FROM chapter_assignment_placeholders cap
+			JOIN chapters c ON cap.chapter_id = c.id WHERE c.series_id = $1
+			UNION
+			SELECT sap.task_id FROM series_assignment_placeholders sap
+			WHERE sap.series_id = $1
+		) combined
+		JOIN tasks t ON t.id = combined.task_id
 		ORDER BY t.level NULLS LAST, t.name`, seriesID)
 	if err != nil {
 		return nil, fmt.Errorf("query task columns: %w", err)
@@ -264,7 +301,32 @@ func (c *Client) GetSeriesSheetData(ctx context.Context, seriesName string) (*Se
 			Completed:   completed,
 		})
 	}
-	return data, assignRows.Err()
+	if err := assignRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 5. Placeholder counts per (chapter, task)
+	phRows, err := c.pool.Query(ctx, `
+		SELECT cap.chapter_id, cap.task_id, COUNT(*) AS cnt
+		FROM chapter_assignment_placeholders cap
+		JOIN chapters c ON cap.chapter_id = c.id
+		WHERE c.series_id = $1
+		GROUP BY cap.chapter_id, cap.task_id`, seriesID)
+	if err != nil {
+		return nil, fmt.Errorf("query placeholders: %w", err)
+	}
+	defer phRows.Close()
+	for phRows.Next() {
+		var chapterID, taskID, cnt int
+		if err := phRows.Scan(&chapterID, &taskID, &cnt); err != nil {
+			return nil, fmt.Errorf("scan placeholder: %w", err)
+		}
+		if _, ok := data.Placeholders[chapterID]; !ok {
+			data.Placeholders[chapterID] = make(map[int]int)
+		}
+		data.Placeholders[chapterID][taskID] = cnt
+	}
+	return data, phRows.Err()
 }
 
 // formatChapterLabel builds the display label for a chapter row.

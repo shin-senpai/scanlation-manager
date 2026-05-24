@@ -6,11 +6,13 @@
 #include "bot/utils/GetAutoCompleteContext.hpp"
 #include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/ChapterAssignmentPlaceholders.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/RoleTasks.hpp"
 #include "db/repositories/Series.hpp"
+#include "db/repositories/SeriesAssignmentPlaceholders.hpp"
 #include "db/repositories/SeriesAssignments.hpp"
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
@@ -51,6 +53,8 @@ void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   ChaptersRepository chapters_repo;
   SeriesAssignmentsRepository series_assignments_repo;
   ChapterAssignmentsRepository chapter_assignments_repo;
+  SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
+  ChapterAssignmentPlaceholdersRepository chapter_placeholder_repo;
 
   const std::string series_name = std::get<std::string>(event.get_parameter("series"));
   std::optional<std::string> name;
@@ -83,6 +87,10 @@ void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, number, name, volume);
     for(const auto &assignment : default_assignments) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
+    }
+    // Cascade series-level placeholders to the new chapter.
+    for(const int task_id : series_placeholder_repo.listTaskIdsBySeries(session.wtx(), maybe_series->id)) {
+      chapter_placeholder_repo.create(session.wtx(), chapter_id, task_id);
     }
     session.commit();
     SheetSync::syncSeries(bot, series_name);
@@ -181,7 +189,10 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   }
 
   try {
+    ChapterAssignmentPlaceholdersRepository placeholder_repo;
     assignments_repo.create(session.wtx(), *maybe_target_id, maybe_chapter->id, maybe_task->id);
+    // Consume one placeholder vacancy for this slot (no-op if none exist).
+    placeholder_repo.removeOne(session.wtx(), maybe_chapter->id, maybe_task->id);
     session.commit();
     SheetSync::syncSeries(bot, series_name);
     SheetSync::syncTodo(bot);
@@ -444,6 +455,8 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   ChaptersRepository chapters_repo;
   SeriesAssignmentsRepository series_assignments_repo;
   ChapterAssignmentsRepository chapter_assignments_repo;
+  SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
+  ChapterAssignmentPlaceholdersRepository chapter_placeholder_repo;
 
   const std::string series_name = std::get<std::string>(event.get_parameter("series"));
   const std::string chapters_input = std::get<std::string>(event.get_parameter("chapters"));
@@ -462,6 +475,7 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   }
 
   const auto default_assignments = series_assignments_repo.listBySeries(session.wtx(), maybe_series->id);
+  const auto placeholder_task_ids = series_placeholder_repo.listTaskIdsBySeries(session.wtx(), maybe_series->id);
 
   std::vector<double> created_nums;
   std::vector<double> skipped_nums;
@@ -474,6 +488,10 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, num);
     for(const auto &assignment : default_assignments) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
+    }
+    // Cascade series-level placeholders to the new chapter.
+    for(const int task_id : placeholder_task_ids) {
+      chapter_placeholder_repo.create(session.wtx(), chapter_id, task_id);
     }
     created_nums.push_back(num);
   }
@@ -508,6 +526,91 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     msg += "\nSkipped (already exist): " + skip_list + ".";
   }
   event.edit_original_response(dpp::message(msg));
+}
+
+void doAddPlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  ChaptersRepository chapters_repo;
+  TasksRepository tasks_repo;
+  ChapterAssignmentPlaceholdersRepository placeholder_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+  const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
+  if(!maybe_chapter) {
+    event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_task->retired_at) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** is retired and cannot have placeholders added."));
+    return;
+  }
+
+  placeholder_repo.create(session.wtx(), maybe_chapter->id, maybe_task->id);
+  const int total = placeholder_repo.count(session.wtx(), maybe_chapter->id, maybe_task->id);
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
+
+  event.edit_original_response(dpp::message(
+      "Added placeholder for **" + task_name + "** on **" + chapter_name + "** (" + std::to_string(total) + " total)."));
+}
+
+void doRemovePlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  ChaptersRepository chapters_repo;
+  TasksRepository tasks_repo;
+  ChapterAssignmentPlaceholdersRepository placeholder_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+  const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
+  if(!maybe_chapter) {
+    event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(placeholder_repo.count(session.wtx(), maybe_chapter->id, maybe_task->id) == 0) {
+    event.edit_original_response(dpp::message("No placeholder exists for **" + task_name + "** on **" + chapter_name + "**."));
+    return;
+  }
+
+  placeholder_repo.removeAll(session.wtx(), maybe_chapter->id, maybe_task->id);
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
+
+  event.edit_original_response(dpp::message(
+      "Removed all placeholders for **" + task_name + "** on **" + chapter_name + "**."));
 }
 
 } // namespace
@@ -555,6 +658,10 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       doBulkAdd(bot, event, session);
     } else if(sub == "move-assignment") {
       doMoveAssignment(bot, event, session);
+    } else if(sub == "add-placeholder") {
+      doAddPlaceholder(bot, event, session);
+    } else if(sub == "remove-placeholder") {
+      doRemovePlaceholder(bot, event, session);
     }
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
@@ -575,7 +682,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
     const std::string lower_input = to_lower(input);
 
     // Series name options
-    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series" || key == "bulk-add/series" || key == "move-assignment/series") {
+    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series" || key == "bulk-add/series" || key == "move-assignment/series" || key == "add-placeholder/series" || key == "remove-placeholder/series") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
@@ -584,7 +691,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
       }
     }
     // Chapter name options — filters based on the already-typed series
-    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter" || key == "move-assignment/chapter") {
+    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter" || key == "move-assignment/chapter" || key == "add-placeholder/chapter" || key == "remove-placeholder/chapter") {
       const std::string series_ctx = BotUtils::getAutoCompleteContext(event, "series");
       if(!series_ctx.empty()) {
         SeriesRepository series_repo;
@@ -601,7 +708,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
       }
     }
     // Task name options
-    else if(key == "assign/task" || key == "unassign/task" || key == "uncomplete/task" || key == "move-assignment/task") {
+    else if(key == "assign/task" || key == "unassign/task" || key == "uncomplete/task" || key == "move-assignment/task" || key == "add-placeholder/task" || key == "remove-placeholder/task") {
       TasksRepository tasks_repo;
       for(const auto &t : tasks_repo.listAll(session.wtx())) {
         if(lower_input.empty() || to_lower(t.name).find(lower_input) != std::string::npos) {

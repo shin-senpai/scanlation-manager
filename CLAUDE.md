@@ -129,6 +129,10 @@ Call placement after `session.commit()`:
 | `/chapter unassign` | `syncSeries` + `syncTodo` |
 | `/chapter uncomplete` | `syncSeries` + `syncTodo` |
 | `/chapter remove` | `syncSeries` + `syncTodo` |
+| `/chapter add-placeholder` | `syncSeries` + `syncTodo` |
+| `/chapter remove-placeholder` | `syncSeries` + `syncTodo` |
+| `/series add-placeholder` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
+| `/series remove-placeholder` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
 | `/work-update` | `syncSeries` + `syncTodo` |
 | `/delete-task` | `syncSeries` (all affected series) + `syncTodo` |
 | `/retire-task` | `syncSeries` (all affected series) + `syncTodo` |
@@ -196,6 +200,9 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 025_add_todo_sheet_view.sql                   — outstanding_chapter_assignments VIEW: prerequisite-aware days_active
 026_update_todo_sheet_view.sql                — Replaces view: adds pc.available, c.status='in_progress', s.status='active' filters
 027_add_active_since_to_todo_view.sql         — Replaces view: swaps days_active (stale int) for active_since (TIMESTAMPTZ) so Days Active can be a live formula in the sheet
+028_add_chapter_assignment_placeholders.sql   — chapter_assignment_placeholders table: unfilled vacancy slots per (chapter, task); surrogate PK allows N placeholders per slot
+029_placeholders_block_dependencies.sql       — Replaces view: placeholder on a prerequisite task now blocks dependent tasks (same as an incomplete assignment)
+030_add_series_assignment_placeholders.sql    — series_assignment_placeholders table: unfilled vacancy slots per (series, task); cascades to chapter-level placeholders on new chapter creation
 ```
 
 ### Key Schema Notes
@@ -207,8 +214,10 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 - Tasks can be hard-deleted only if they have no completed `chapter_assignments`; otherwise use `tasks.retired_at` (soft-delete)
 - Deleting a role or task cascades to junction tables (`role_tasks`, `user_roles`, `series_assignments`, `task_dependencies`) via `ON DELETE CASCADE`; `chapter_assignments` is intentionally excluded from cascade to preserve history
 - Deleting a series or chapter cascades to child records; completed assignments must be cleared before deletion (the application handles this in the supermanager path before calling `remove()`)
+- `chapter_assignment_placeholders` holds unfilled vacancy slots for a (chapter, task) pair. Each row represents one open slot; multiple rows per pair are allowed. Placeholders are consumed one-by-one when users are assigned (oldest first). Retiring a task deletes all placeholders for it. Series-level `sync_chapters` assignment clears all placeholders for that task in the series.
+- `series_assignment_placeholders` holds unfilled vacancy slots at the series level, analogous to `series_assignments`. When a new chapter is created, one chapter-level placeholder is created per series-level placeholder row for that series. Retiring a task deletes all series-level placeholders for it. A series-level `assign` clears the corresponding series-level and (when `sync_chapters=true`) chapter-level placeholders.
 - `bot_settings` is a simple `(key TEXT, value TEXT)` store — currently only `gsheet_enabled = "1"` is used
-- `outstanding_chapter_assignments` (view, migrations 025+026) returns all actionable incomplete assignments: prerequisites satisfied (using only assignments that exist — unassigned prerequisites are ignored), chapter is `in_progress`, series is `active`. Used by the Todo sheet backend and referenced conceptually by `/todo` (which does equivalent filtering in-memory)
+- `outstanding_chapter_assignments` (view, migrations 025–029) returns all actionable incomplete assignments: prerequisites satisfied (a prerequisite with no assignment AND no placeholder is ignored; a placeholder counts as a blocker just like an incomplete assignment), chapter is `in_progress`, series is `active`. Used by the Todo sheet backend and referenced conceptually by `/todo` (which does equivalent filtering in-memory)
 
 ---
 
@@ -308,8 +317,9 @@ User    | Task
 Chapter | Status | Closed At | <task1> | <task2> | ...
 <Ch.X Name> | in_progress | N/A | <assignee or ✓ Name or N/A> | ...
 ```
-- Task columns are all tasks that appear in at least one chapter assignment for the series, ordered by `tasks.level` then `tasks.name`
-- Cell values: `N/A` (unassigned), display name (assigned, incomplete), `✓ Name` (completed)
+- Task columns are all tasks that appear in at least one chapter assignment **or placeholder** for the series, ordered by `tasks.level` then `tasks.name`
+- Cell values: `N/A` (unassigned, no placeholder), display name (assigned, incomplete), `✓ Name` (completed), `TBD` (placeholder — unfilled vacancy), or mixed (e.g. `Alice, TBD` — one user assigned, one vacancy open)
+- Cells containing `TBD` are highlighted in red (Material Red 200 — `rgb(239,154,154)`) via a TEXT_CONTAINS conditional format rule
 - `Closed At` is `N/A` if `chapters.closed_at IS NULL`
 
 ### Manual Setup (one-time, before `/gsheet enable`)
@@ -371,7 +381,7 @@ Add command. Creates a task. Name is normalised to uppercase. `level` is an inte
 Remove command. Hard-deletes the task. Fails if any completed `chapter_assignments` exist for this task — use `/retire-task` instead. Cascades to `role_tasks`, `task_dependencies`, outstanding `chapter_assignments`, and `series_assignments`. Fires `syncSeries` for all series that had assignments for the task, plus `syncTodo`. Requires manager+.
 
 ### /retire-task \<task\>
-Modify command. Soft-deletes the task (sets `retired_at`). Removes all series-level and outstanding chapter-level assignments for the task. Fires `syncSeries` for all affected series, plus `syncTodo`. Retired tasks cannot be assigned. Requires manager+.
+Modify command. Soft-deletes the task (sets `retired_at`). Removes all series-level and outstanding chapter-level assignments for the task, **and all series-level and chapter-level placeholder slots** for that task. Fires `syncSeries` for all affected series, plus `syncTodo`. Retired tasks cannot be assigned. Requires manager+.
 
 ### /unretire-task \<task\>
 Modify command. Clears `retired_at` on the task. Requires manager+.
@@ -422,9 +432,11 @@ Manage command. Requires manager+.
 |-----------|-------------|
 | `add <name>` | Creates the series; fires `syncSeries` |
 | `set-status <name> <status>` | Updates status (`active`/`completed`/`hiatus`/`dropped`); fires `syncSeries` + `syncTodo` |
-| `assign <name> <user> <task> [sync_chapters]` | Adds a series-level crew assignment (validates user has a capable role). When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them. Fires `syncSeries` + `syncTodo` (if synced). |
+| `assign <name> <user> <task> [sync_chapters]` | Adds a series-level crew assignment (validates user has a capable role). Clears the series-level placeholder for that task (all slots). When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them, and clears chapter-level placeholders for that task across those chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 | `unassign <name> <user> <task> [sync_chapters]` | Removes a series-level crew assignment. When `sync_chapters` is true (default), also removes outstanding (not completed) chapter assignments for that user+task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 | `remove <name>` | Deletes the series and all chapters. If completed assignments exist, requires supermanager (clears `completed_at` first to bypass immutability trigger); fires `deleteSeries` + `syncTodo` |
+| `add-placeholder <name> <task> [sync_chapters]` | Adds one series-level vacancy slot for the task. When `sync_chapters` is true (default), also creates one chapter-level placeholder per non-released chapter in the series. Blocked if the task is retired. Fires `syncSeries` + `syncTodo` (if synced). |
+| `remove-placeholder <name> <task> [sync_chapters]` | Removes all series-level placeholder slots for the task. Reports an error if none exist. When `sync_chapters` is true (default), also removes all chapter-level placeholders for that task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 
 ### /chapter \<subcommand\>
 Manage command. Requires manager+.
@@ -433,24 +445,26 @@ Manage command. Requires manager+.
 |-----------|-------------|
 | `add <series> <number> [name] [volume]` | Creates chapter; copies series-level crew assignments as chapter assignments; fires `syncSeries` + `syncTodo` |
 | `set-status <series> <chapter> <status>` | Updates status (`in_progress`/`released`/`dropped`/`hiatus`); fires `syncSeries` + `syncTodo` |
-| `assign <series> <chapter> <user> <task>` | Adds a chapter assignment (validates user has a capable role); fires `syncSeries` + `syncTodo` |
+| `assign <series> <chapter> <user> <task>` | Adds a chapter assignment (validates user has a capable role); consumes one placeholder for that slot if any exist; fires `syncSeries` + `syncTodo` |
 | `unassign <series> <chapter> <user> <task>` | Removes outstanding assignment (blocked if already completed); fires `syncSeries` + `syncTodo` |
 | `uncomplete <series> <chapter> <user> <task>` | Clears `completed_at` on a completed assignment (chapter must be `in_progress`); fires `syncSeries` + `syncTodo` |
 | `remove <series> <chapter>` | Deletes the chapter. Requires supermanager if completed assignments exist; fires `syncSeries` + `syncTodo` |
 | `bulk-add <series> <chapters>` | Adds multiple chapters at once; `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`); copies series-level crew to each; skips numbers that already exist; fires `syncSeries` + `syncTodo` if any chapter was created |
+| `add-placeholder <series> <chapter> <task>` | Adds one unfilled vacancy slot for (chapter, task). Multiple placeholders per slot are supported. Appears as red `TBD` in the series sheet. Blocked if task is retired. Fires `syncSeries` + `syncTodo`. |
+| `remove-placeholder <series> <chapter> <task>` | Removes **all** placeholder slots for (chapter, task). Reports an error if none exist. Fires `syncSeries` + `syncTodo`. |
 
 ### /work-update \<series\> \<chapter\> \<task\> [user]
 Modify command. Marks a chapter assignment complete for the calling user (or a target user, if manager+).
 - Checks that the assignment exists and is not already completed
 - Checks that all task dependencies are satisfied for this chapter
 - If dependents exist: pings assignees of tasks that are now **fully unblocked** (all their dependencies complete) — tasks still blocked by other prerequisites are not pinged
-- If no dependents remain: auto-sets the chapter status to `released`
+- If no incomplete assignments remain **and no placeholder slots exist**: auto-sets the chapter status to `released`
 - Fires `syncSeries` + `syncTodo`
 
 ### /bulk-work-update \<series\> \<task\> \<chapters\> [user]
 Modify command. Marks a task complete across multiple chapters in one command. `chapters` is a comma-separated list of chapter numbers (e.g. `51,52,53.5`). Input is normalized and validated before any DB write.
 - All chapters are validated first (exists, assigned, not already complete, no blocking dependencies) — if any fail the entire command is aborted with a per-chapter error report
-- On success: marks all complete, pings assignees of tasks now fully unblocked (deduplicated across chapters), auto-releases chapters with no remaining dependents
+- On success: marks all complete, pings assignees of tasks now fully unblocked (deduplicated across chapters), auto-releases chapters with no remaining incomplete assignments **and no placeholder slots**
 - Fires `syncSeries` + `syncTodo`
 
 ### /gsheet \<enable|disable\>
@@ -503,8 +517,8 @@ Currently parses and echoes the parsed fields back. No DB write yet.
 | `/user-history` | Done |
 | `/work-update` | Done |
 | `/bulk-work-update` | Done |
-| `/series` (add, set-status, assign, unassign, remove) | Done |
-| `/chapter` (add, set-status, assign, unassign, uncomplete, remove, bulk-add) | Done |
+| `/series` (add, set-status, assign, unassign, remove, move-assignment, add-placeholder, remove-placeholder) | Done |
+| `/chapter` (add, set-status, assign, unassign, uncomplete, remove, bulk-add, move-assignment, add-placeholder, remove-placeholder) | Done |
 | `/gsheet` (enable, disable) | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | MangaDex integration (backend) | Stub only — not started |

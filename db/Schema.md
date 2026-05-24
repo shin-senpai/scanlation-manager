@@ -219,6 +219,29 @@ Which users are assigned to a series for a given task — the default crew. Used
 
 ---
 
+### `series_assignment_placeholders`
+
+Unfilled vacancy slots at the series level, indicating "we need someone for this task across new chapters but haven't found them yet." Multiple rows per `(series_id, task_id)` are allowed — each row represents one open slot. Cascades to chapter-level placeholders when new chapters are created.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK (surrogate — allows multiple rows per slot) |
+| `series_id` | `INT` | No | — | FK → `series(id)` ON DELETE CASCADE |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+
+**Indexes:**
+- `idx_sap_series_id` on `(series_id)`
+- `idx_sap_series_task` on `(series_id, task_id)`
+
+**Lifecycle:**
+- Added by `/series add-placeholder`; removed all-at-once by `/series remove-placeholder`
+- Cleared (all slots for the task) when a user is assigned at the series level via `/series assign`
+- All placeholders for a task are deleted when the task is retired (`/retire-task`)
+- When `sync_chapters` is true, creation/removal cascades to chapter-level placeholders for all non-released chapters in the series
+
+---
+
 ### `chapter_assignments`
 
 Which users are assigned to a specific chapter for a given task. Doubles as both the to-do list and the completion record.
@@ -238,6 +261,31 @@ Which users are assigned to a specific chapter for a given task. Doubles as both
 
 **Triggers:**
 - `enforce_completed_assignment_immutable` — before DELETE, raises if `completed_at IS NOT NULL`. Completed rows are permanent historical records; only outstanding rows may be removed.
+
+---
+
+### `chapter_assignment_placeholders`
+
+Unfilled vacancy slots that indicate "we need someone for this task on this chapter but haven't found them yet." Multiple rows per `(chapter_id, task_id)` are allowed — each row represents one open slot.
+
+| Column | Type | Nullable | Default | Notes |
+|--------|------|----------|---------|-------|
+| `id` | `SERIAL` | No | — | PK (surrogate — allows multiple rows per slot) |
+| `chapter_id` | `INT` | No | — | FK → `chapters(id)` ON DELETE CASCADE |
+| `task_id` | `INT` | No | — | FK → `tasks(id)` ON DELETE CASCADE |
+| `created_at` | `TIMESTAMPTZ` | No | `NOW()` | |
+
+**Indexes:**
+- `idx_cap_chapter_id` on `(chapter_id)`
+- `idx_cap_chapter_task` on `(chapter_id, task_id)`
+
+**Lifecycle:**
+- Added by `/chapter add-placeholder`; removed all-at-once by `/chapter remove-placeholder`
+- Consumed one-by-one (oldest first by `id`) when a user is assigned to the same `(chapter, task)` slot
+- All placeholders for a task are deleted when the task is retired (`/retire-task`)
+- All placeholders for a task across a series are deleted when a series-level assignment with `sync_chapters` covers the slot
+
+**Sheet representation:** Each placeholder row causes one `TBD` entry in the corresponding series sheet cell. A cell may contain mixed content (e.g. `Alice, TBD` = one user assigned, one vacancy remaining). Cells containing `TBD` are highlighted in red.
 
 ---
 
@@ -267,7 +315,7 @@ Returns all incomplete chapter assignments that are currently actionable — pre
 
 **Filters applied:**
 - `chapter_assignments.completed_at IS NULL` — outstanding only
-- Prerequisite check passes — only assignments that exist and are complete count as satisfied (unassigned prerequisites are ignored)
+- Prerequisite check passes — a prerequisite blocks if it has an incomplete assignment OR a placeholder (unfilled vacancy); a prerequisite with neither is ignored
 - `chapters.status = 'in_progress'`
 - `series.status = 'active'`
 
@@ -304,6 +352,7 @@ All triggers are `DEFERRABLE INITIALLY DEFERRED` — they fire at the end of the
 - **Roles vs tasks:** `roles` describe what a user *can* do. `tasks` describe the steps a chapter requires. `role_tasks` connects them for assignment validation. Assignments themselves (`series_assignments`, `chapter_assignments`) are task-scoped — not role-scoped — to avoid ambiguity.
 - **Task tracking:** `chapter_assignments.completed_at` is both the "done" flag and the completion timestamp in one column. To-do list = `WHERE completed_at IS NULL`; history = `WHERE completed_at IS NOT NULL`.
 - **Soft deletes:** Users (`left_at`), aliases (`retired_at`), and Discord identities (`unlinked_at`) are never hard-deleted — deactivation is recorded while historical data is preserved. Tasks follow a hybrid approach: hard-deleted if they have no completion history, soft-deleted (`retired_at`) otherwise to preserve the record.
-- **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, and `task_dependencies`. Deleting a series cascades to `series_assignments` and `chapters`; deleting a chapter cascades to `chapter_assignments`. The `chapter_assignments` cascade fires the immutability trigger, so application code must `NULL` out `completed_at` on any completed rows before deleting a chapter or series with completion history (supermanager path only — managers are blocked from deleting anything with completed history). `chapter_assignments.task_id` has no cascade — tasks with completion history must be retired rather than deleted to preserve the record.
+- **Cascading deletes:** Deleting a role cascades to `user_roles` and `role_tasks`. Deleting a task cascades to `role_tasks`, `series_assignments`, `series_assignment_placeholders`, `task_dependencies`, and `chapter_assignment_placeholders`. Deleting a series cascades to `series_assignments`, `series_assignment_placeholders`, and `chapters`; deleting a chapter cascades to `chapter_assignments` and `chapter_assignment_placeholders`. The `chapter_assignments` cascade fires the immutability trigger, so application code must `NULL` out `completed_at` on any completed rows before deleting a chapter or series with completion history (supermanager path only — managers are blocked from deleting anything with completed history). `chapter_assignments.task_id` has no cascade — tasks with completion history must be retired rather than deleted to preserve the record.
+- **Placeholder slots:** `chapter_assignment_placeholders` and `series_assignment_placeholders` are operational tables (not historical). It is safe to delete their rows at any time without breaking history. `series_assignment_placeholders` mirrors `series_assignments` — it tracks unfilled vacancies at the series level and cascades to chapter-level placeholders when new chapters are created or when `sync_chapters` is true. The application clears placeholders aggressively: on task retirement, on series-level `sync_chapters` assignment (clears both series- and chapter-level), and when a user assignment fills a chapter slot (consuming the oldest placeholder row). Auto-release of chapters checks both `chapter_assignments` (no incomplete rows) and `chapter_assignment_placeholders` (no remaining slots) before marking a chapter `released`.
 - **Case insensitivity:** `citext` columns compare and enforce uniqueness case-insensitively but store values exactly as inserted. `PR` and `pr` cannot coexist; a lookup for either finds the same row.
 - **Name normalization:** `roles.name` and `tasks.name` are additionally normalized to uppercase on write via a `BEFORE INSERT OR UPDATE` trigger. Any casing passed in (`pR`, `pr`, `PR`) is stored and returned as `PR`. `series.name` and `chapters.name` are excluded — those are display names where casing is meaningful.

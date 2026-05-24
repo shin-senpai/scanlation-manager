@@ -7,6 +7,7 @@
 #include "bot/utils/ParseChapterNumbers.hpp"
 #include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/ChapterAssignmentPlaceholders.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
@@ -172,8 +173,11 @@ void Commands::bulkWorkProgress(Bot &bot, const dpp::slashcommand_t &event) {
       for(const auto &[did, dep_task] : dependents) {
         pings_by_task[dep_task].insert(did);
       }
-      // Auto-release only when no incomplete assignments remain for this chapter
-      if(assignments_repo.listByChapter(session.wtx(), ch.id, std::nullopt, false).empty()) {
+      // Auto-release only when no incomplete assignments remain and no placeholder
+      // vacancies exist (a placeholder indicates someone still needs to be found).
+      ChapterAssignmentPlaceholdersRepository placeholder_repo;
+      if(assignments_repo.listByChapter(session.wtx(), ch.id, std::nullopt, false).empty()
+         && !placeholder_repo.existsForChapter(session.wtx(), ch.id)) {
         chapters_to_release.push_back(ch.id);
       }
     }

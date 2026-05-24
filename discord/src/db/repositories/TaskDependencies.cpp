@@ -123,14 +123,24 @@ std::unordered_map<int, std::vector<int>> TaskDependenciesRepository::listAll(pq
 }
 
 std::optional<std::string> TaskDependenciesRepository::findFirstBlockingDependency(pqxx::transaction_base &txn, int chapter_id, int task_id) {
+  // A prerequisite blocks if it has an outstanding assignment OR a placeholder (unfilled vacancy).
   auto result = txn.exec(
       "SELECT t.name"
-      " FROM chapter_assignments ca"
-      " JOIN task_dependencies td ON ca.task_id = td.depends_on_task_id"
-      " JOIN tasks t ON t.id = ca.task_id"
-      " WHERE td.task_id = $1 AND ca.chapter_id = $2 AND ca.completed_at IS NULL"
+      " FROM task_dependencies td"
+      " JOIN tasks t ON t.id = td.depends_on_task_id"
+      " WHERE td.task_id = $1"
+      " AND ("
+      "   EXISTS ("
+      "     SELECT 1 FROM chapter_assignments ca"
+      "     WHERE ca.task_id = td.depends_on_task_id AND ca.chapter_id = $2 AND ca.completed_at IS NULL"
+      "   )"
+      "   OR EXISTS ("
+      "     SELECT 1 FROM chapter_assignment_placeholders cap"
+      "     WHERE cap.task_id = td.depends_on_task_id AND cap.chapter_id = $2"
+      "   )"
+      " )"
       " LIMIT 1",
-      pqxx::params(txn, task_id, chapter_id));
+      pqxx::params(task_id, chapter_id));
   if(result.empty()) {
     return std::nullopt;
   }
@@ -146,11 +156,21 @@ std::vector<std::pair<int64_t, std::string>> TaskDependenciesRepository::findDep
       " JOIN tasks t ON t.id = ca.task_id"
       " WHERE td.depends_on_task_id = $1 AND ca.chapter_id = $2"
       " AND ca.completed_at IS NULL AND di.unlinked_at IS NULL"
+      // Don't ping if any prerequisite still has an incomplete assignment OR a placeholder.
       " AND NOT EXISTS ("
       "   SELECT 1 FROM task_dependencies td2"
-      "   JOIN chapter_assignments blocker ON blocker.task_id = td2.depends_on_task_id"
-      "     AND blocker.chapter_id = $2 AND blocker.completed_at IS NULL"
       "   WHERE td2.task_id = ca.task_id"
+      "   AND ("
+      "     EXISTS ("
+      "       SELECT 1 FROM chapter_assignments blocker"
+      "       WHERE blocker.task_id = td2.depends_on_task_id"
+      "         AND blocker.chapter_id = $2 AND blocker.completed_at IS NULL"
+      "     )"
+      "     OR EXISTS ("
+      "       SELECT 1 FROM chapter_assignment_placeholders cap"
+      "       WHERE cap.task_id = td2.depends_on_task_id AND cap.chapter_id = $2"
+      "     )"
+      "   )"
       " )",
       pqxx::params(txn, depends_on_task_id, chapter_id));
   std::vector<std::pair<int64_t, std::string>> assignees;

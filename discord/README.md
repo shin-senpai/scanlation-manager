@@ -44,8 +44,8 @@ scanlation-manager/
 | ✅ | `/list-tasks` — List all tasks |
 | ✅ | `/list-role-tasks` — List all role-task mappings |
 | ✅ | `/list-task-deps` — Show the prerequisite graph for a task |
-| ✅ | `/series` — Manage series: add, set-status, assign/unassign default crew, remove |
-| ✅ | `/chapter` — Manage chapters: add, bulk-add, set-status, assign/unassign/uncomplete/remove |
+| ✅ | `/series` — Manage series: add, set-status, assign/unassign/move-assignment default crew, add-placeholder, remove-placeholder, remove |
+| ✅ | `/chapter` — Manage chapters: add, bulk-add, set-status, assign/unassign/uncomplete/remove, move-assignment, add-placeholder, remove-placeholder |
 | ✅ | `/list-series` — List series with chapter counts and latest activity, optional status filter |
 | ✅ | `/list-chapters` — List chapters with task completion stats, optional series/status/sort |
 | ✅ | `/info` — Deep-dive view for a series (crew + chapters), chapter (assignments), or user profile |
@@ -92,8 +92,8 @@ discord/
 │   │   ├── User, DiscordIdentities, UserAliases, UserCredentials
 │   │   ├── Roles, UserRoles, RoleTasks
 │   │   ├── Tasks, TaskDependencies
-│   │   ├── Series, SeriesAssignments
-│   │   ├── Chapters, ChapterAssignments
+│   │   ├── Series, SeriesAssignments, SeriesAssignmentPlaceholders
+│   │   ├── Chapters, ChapterAssignments, ChapterAssignmentPlaceholders
 │   │   └── BotSettings                           # Runtime key-value config (gsheet_enabled)
 │   └── utils/
 │       └── PqxxErrors.hpp / PqxxErrors.cpp        # Constraint name extraction from pqxx exceptions
@@ -219,6 +219,12 @@ The first user to run `/register` is automatically granted Supermanager.
 | `/remove-task-dep` | Manager |
 | `/series` | Manager (`remove` with completion history requires Supermanager) |
 | `/chapter` | Manager (`remove` with completion history requires Supermanager) |
+| `/chapter add-placeholder` | Manager |
+| `/chapter remove-placeholder` | Manager |
+| `/chapter move-assignment` | Manager |
+| `/series add-placeholder` | Manager |
+| `/series remove-placeholder` | Manager |
+| `/series move-assignment` | Manager |
 | `/set-staff-role` | Supermanager |
 | `/promote` | Supermanager |
 | `/demote` | Supermanager |
@@ -269,7 +275,7 @@ Deletes a role and cascades to all role-task mappings and user-role assignments.
 Deletes a task. Only allowed if the task has no completed chapter assignments — use `/retire-task` instead if it does. After deletion, fires a sheet sync for every series that had assignments for the task. Manager+.
 
 ### `/retire-task [name]`
-Soft-retires a task (sets `retired_at`). Removes all series-level and outstanding chapter assignments for the task, then syncs every affected series sheet. Completed assignment history is preserved. Retired tasks cannot be assigned. Manager+.
+Soft-retires a task (sets `retired_at`). Removes all series-level and outstanding chapter assignments for the task, **and all series-level and chapter-level placeholder slots** for that task, then syncs every affected series sheet. Completed assignment history is preserved. Retired tasks cannot be assigned. Manager+.
 
 ### `/unretire-task [name]`
 Restores a retired task to active status. Manager+.
@@ -303,20 +309,25 @@ Multi-subcommand for managing series. Manager+.
 
 - **`add [name]`** — Create a new series.
 - **`set-status [name] [status]`** — Update series status (`active`, `hiatus`, `completed`, `dropped`).
-- **`assign [name] [user] [task] [sync_chapters?]`** — Add a user to the series' default crew for a task. The user must hold a role mapped to that task. New chapters automatically inherit these assignments. When `sync_chapters` is `true` (default), also adds the assignment to every existing non-released chapter in the series that the user isn't already assigned to.
+- **`assign [name] [user] [task] [sync_chapters?]`** — Add a user to the series' default crew for a task. The user must hold a role mapped to that task. New chapters automatically inherit these assignments. Also clears the series-level placeholder for that task. When `sync_chapters` is `true` (default), also adds the assignment to every existing non-released chapter in the series that the user isn't already assigned to, and clears chapter-level placeholders for that task in the series.
 - **`unassign [name] [user] [task] [sync_chapters?]`** — Remove a user from the default crew. When `sync_chapters` is `true` (default), also removes their outstanding (not yet completed) chapter assignments across all non-released chapters in the series. Completed assignments are never removed.
 - **`remove [name]`** — Delete a series and all its chapters. Manager can remove series with no completed assignments; Supermanager can remove any (completed assignments are cleared first to bypass the immutability trigger).
+- **`add-placeholder [name] [task] [sync_chapters?]`** — Add a series-level vacancy slot indicating that staff is needed for this task. Blocked if the task is retired. When `sync_chapters` is `true` (default), also creates one chapter-level placeholder per non-released chapter in the series.
+- **`remove-placeholder [name] [task] [sync_chapters?]`** — Remove all series-level placeholder slots for the task. Reports an error if none exist. When `sync_chapters` is `true` (default), also removes all chapter-level placeholders for that task across all non-released chapters.
 
 ### `/chapter`
 Multi-subcommand for managing chapters. Manager+.
 
 - **`add [series] [number] [name?] [volume?]`** — Add a chapter. Automatically creates chapter assignments from the series' default crew.
 - **`set-status [series] [chapter] [status]`** — Update chapter status (`in_progress`, `released`, `hiatus`, `dropped`).
-- **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a task. The user must hold a role mapped to that task.
+- **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a task. The user must hold a role mapped to that task. Automatically consumes one placeholder vacancy for that slot if any exist.
 - **`unassign [series] [chapter] [user] [task]`** — Remove an outstanding assignment. Cannot remove a completed assignment — use `uncomplete` first.
 - **`uncomplete [series] [chapter] [user] [task]`** — Mark a completed assignment as outstanding again. Only allowed when the chapter status is `in_progress`.
 - **`remove [series] [chapter]`** — Delete a chapter and all its assignments. Manager can remove chapters with no completed assignments; Supermanager can remove any.
 - **`bulk-add [series] [chapters]`** — Add multiple chapters at once. `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`). Input is normalized and validated. Each new chapter inherits the series' default crew. Numbers that already exist are skipped and reported.
+- **`move-assignment [series] [chapter] [from_user] [to_user] [task]`** — Transfer an outstanding assignment from one user to another. To user must hold a capable role. Blocked if the assignment is already completed.
+- **`add-placeholder [series] [chapter] [task]`** — Mark a chapter+task slot as needing staff without assigning anyone yet. Multiple placeholders per slot are allowed (e.g. if two people are needed for the same task). Appears as a red **TBD** cell in the series sheet. Blocked if the task is retired.
+- **`remove-placeholder [series] [chapter] [task]`** — Remove all placeholder vacancies for a chapter+task slot. Reports an error if no placeholder exists.
 
 All name fields support autocomplete.
 
@@ -353,7 +364,7 @@ Marks a chapter task assignment as complete. All fields support autocomplete —
 - **`user`** (manager+) — Mark complete on behalf of another user.
 - **Dependency checking:** Blocks until all prerequisite tasks for that chapter are complete.
 - **Downstream pings:** Mentions all users whose tasks were unblocked by this completion.
-- **Auto-release:** If no dependents exist (this was the last task), the chapter status is automatically set to `released`.
+- **Auto-release:** If no incomplete assignments remain **and no placeholder vacancies exist**, the chapter status is automatically set to `released`.
 
 ### `/bulk-work-update [series] [task] [chapters] [user?]`
 Marks a task complete across multiple chapters in a single command. `chapters` is a comma-separated list of chapter numbers (e.g. `51,52,53.5`). Input is normalized and validated. Autocomplete is available for `series` and `task`; `task` is filtered to incomplete assignments in the selected series.
@@ -361,7 +372,7 @@ Marks a task complete across multiple chapters in a single command. `chapters` i
 - **`user`** (manager+) — Mark complete on behalf of another user.
 - **Validate-then-execute:** All chapters are checked first — any error (not found, not assigned, already complete, dependency blocked) aborts the entire command with a per-chapter report.
 - **Downstream pings:** Mentions users whose tasks became fully unblocked, deduplicated across all chapters.
-- **Auto-release:** Chapters with no remaining dependents are automatically set to `released`.
+- **Auto-release:** Chapters with no remaining incomplete assignments **and no placeholder vacancies** are automatically set to `released`.
 
 ### `/todo [user?]`
 Shows all outstanding task assignments that are ready to start (prerequisites satisfied), grouped by series and chapter.

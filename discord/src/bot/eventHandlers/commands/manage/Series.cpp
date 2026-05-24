@@ -5,10 +5,12 @@
 #include "bot/Bot.hpp"
 #include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/ChapterAssignmentPlaceholders.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
 #include "db/repositories/RoleTasks.hpp"
 #include "db/repositories/Series.hpp"
+#include "db/repositories/SeriesAssignmentPlaceholders.hpp"
 #include "db/repositories/SeriesAssignments.hpp"
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
@@ -121,11 +123,17 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   }
 
   try {
+    ChapterAssignmentPlaceholdersRepository chapter_placeholder_repo;
+    SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
     assignments_repo.create(session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+    // Assigning a user fills one series-level vacancy — consume the oldest placeholder slot.
+    series_placeholder_repo.removeOne(session.wtx(), maybe_series->id, maybe_task->id);
     int chapters_affected = 0;
     if(sync_chapters) {
       chapters_affected = chapter_assignments_repo.createForSeriesIfMissing(
           session.wtx(), *maybe_target_id, maybe_series->id, maybe_task->id);
+      // Consume one chapter-level placeholder per chapter (mirrors the single series slot consumed).
+      chapter_placeholder_repo.removeOnePerChapterForTaskInSeries(session.wtx(), maybe_series->id, maybe_task->id);
     }
     session.commit();
     SheetSync::syncSeries(bot, series_name);
@@ -339,6 +347,114 @@ void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Pe
       "Series **" + series_name + "** and all its chapters have been deleted."));
 }
 
+void doAddPlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  TasksRepository tasks_repo;
+  SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
+  ChapterAssignmentPlaceholdersRepository chapter_placeholder_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("name"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_task->retired_at) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** is retired and cannot have placeholders added."));
+    return;
+  }
+
+  bool sync_chapters = true;
+  const auto sync_param = event.get_parameter("sync_chapters");
+  if(const auto *b = std::get_if<bool>(&sync_param)) {
+    sync_chapters = *b;
+  }
+
+  series_placeholder_repo.create(session.wtx(), maybe_series->id, maybe_task->id);
+  const int total = series_placeholder_repo.count(session.wtx(), maybe_series->id, maybe_task->id);
+
+  int chapters_affected = 0;
+  if(sync_chapters) {
+    // Add one chapter-level placeholder to every non-released chapter in the series.
+    const auto result = session.wtx().exec(
+        "SELECT id FROM chapters WHERE series_id = $1 AND status != 'released'",
+        pqxx::params(maybe_series->id));
+    for(const auto &row : result) {
+      chapter_placeholder_repo.create(session.wtx(), row[0].as<int>(), maybe_task->id);
+      ++chapters_affected;
+    }
+  }
+
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
+
+  std::string msg = "Added placeholder for **" + task_name + "** on **" + series_name + "** (" + std::to_string(total) + " total).";
+  if(sync_chapters) {
+    msg += chapters_affected > 0
+               ? "\n(Added to " + std::to_string(chapters_affected) + " existing chapter(s).)"
+               : "\n(No existing chapters to sync.)";
+  }
+  event.edit_original_response(dpp::message(msg));
+}
+
+void doRemovePlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  TasksRepository tasks_repo;
+  SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
+  ChapterAssignmentPlaceholdersRepository chapter_placeholder_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("name"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(series_placeholder_repo.count(session.wtx(), maybe_series->id, maybe_task->id) == 0) {
+    event.edit_original_response(dpp::message("No placeholder exists for **" + task_name + "** on **" + series_name + "**."));
+    return;
+  }
+
+  bool sync_chapters = true;
+  const auto sync_param = event.get_parameter("sync_chapters");
+  if(const auto *b = std::get_if<bool>(&sync_param)) {
+    sync_chapters = *b;
+  }
+
+  series_placeholder_repo.removeAll(session.wtx(), maybe_series->id, maybe_task->id);
+  if(sync_chapters) {
+    chapter_placeholder_repo.removeAllForTaskInSeries(session.wtx(), maybe_series->id, maybe_task->id);
+  }
+
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
+
+  std::string msg = "Removed all placeholders for **" + task_name + "** on **" + series_name + "**.";
+  if(sync_chapters) {
+    msg += "\n(Chapter-level placeholders for this task also cleared.)";
+  }
+  event.edit_original_response(dpp::message(msg));
+}
+
 } // namespace
 
 void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
@@ -380,6 +496,10 @@ void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
       doRemove(bot, event, session, user_perm);
     } else if(sub == "move-assignment") {
       doMoveAssignment(bot, event, session);
+    } else if(sub == "add-placeholder") {
+      doAddPlaceholder(bot, event, session);
+    } else if(sub == "remove-placeholder") {
+      doRemovePlaceholder(bot, event, session);
     }
   } catch(const std::exception &e) {
     std::cerr << "series/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
@@ -399,14 +519,14 @@ void Commands::seriesAutocomplete(Bot &bot, const std::string &key, const std::s
     };
     const std::string lower_input = to_lower(input);
 
-    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name" || key == "remove/name" || key == "move-assignment/name") {
+    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name" || key == "remove/name" || key == "move-assignment/name" || key == "add-placeholder/name" || key == "remove-placeholder/name") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
           r.add_autocomplete_choice(dpp::command_option_choice(s.name, s.name));
         }
       }
-    } else if(key == "assign/task" || key == "unassign/task" || key == "move-assignment/task") {
+    } else if(key == "assign/task" || key == "unassign/task" || key == "move-assignment/task" || key == "add-placeholder/task" || key == "remove-placeholder/task") {
       TasksRepository tasks_repo;
       for(const auto &t : tasks_repo.listAll(session.wtx())) {
         if(lower_input.empty() || to_lower(t.name).find(lower_input) != std::string::npos) {

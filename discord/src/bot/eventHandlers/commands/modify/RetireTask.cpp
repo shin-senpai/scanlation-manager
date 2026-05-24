@@ -5,8 +5,10 @@
 #include "bot/Bot.hpp"
 #include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/ChapterAssignmentPlaceholders.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/DiscordIdentities.hpp"
+#include "db/repositories/SeriesAssignmentPlaceholders.hpp"
 #include "db/repositories/SeriesAssignments.hpp"
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
@@ -58,9 +60,13 @@ void Commands::retireTask(Bot &bot, const dpp::slashcommand_t &event) {
       return;
     }
 
+    ChapterAssignmentPlaceholdersRepository placeholder_repo;
+    SeriesAssignmentPlaceholdersRepository series_placeholder_repo;
     const auto affected_series = series_assignments_repo.listSeriesNamesByTask(session.wtx(), maybe_task->id);
     series_assignments_repo.removeAllByTask(session.wtx(), maybe_task->id);
     chapter_assignments_repo.removeOutstandingByTask(session.wtx(), maybe_task->id);
+    series_placeholder_repo.removeAllByTask(session.wtx(), maybe_task->id);
+    placeholder_repo.removeAllByTask(session.wtx(), maybe_task->id);
     tasks_repo.retire(session.wtx(), maybe_task->id);
     session.commit();
 

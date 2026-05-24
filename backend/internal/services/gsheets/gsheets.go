@@ -203,6 +203,9 @@ func (c *Client) FormatSeriesSheet(ctx context.Context, name string, l SeriesShe
 	// (b) Crew section header (row 2, cols 0–1)
 	reqs = append(reqs, repeatCell(sheetID, 2, 3, 0, 2, headerFmt, headerFields))
 
+	// (b2) Crew TBD rows: red background when User cell equals "TBD"
+	reqs = append(reqs, condFmtTextEq(sheetID, 3, 3+C, 0, 1, "TBD", rgb(239, 154, 154)))
+
 	// (c) Chapter table header row
 	reqs = append(reqs, repeatCell(sheetID, chapterHeaderRow, chapterHeaderRow+1, 0, totalCols, headerFmt, headerFields))
 
@@ -223,11 +226,12 @@ func (c *Client) FormatSeriesSheet(ctx context.Context, name string, l SeriesShe
 			reqs = append(reqs, condFmtTextEq(sheetID, chapterDataStart, chapterDataEnd, statusCol, statusCol+1, sc.value, sc.color))
 		}
 
-		// (f) Task columns: ✓ cells green, N/A cells grey
+		// (f) Task columns: ✓ cells green, N/A cells grey, TBD cells red
 		if T > 0 {
 			reqs = append(reqs,
 				condFmtTextStartsWith(sheetID, chapterDataStart, chapterDataEnd, 3, totalCols, "✓", rgb(220, 237, 200)),
 				condFmtTextEq(sheetID, chapterDataStart, chapterDataEnd, 3, totalCols, "N/A", rgb(238, 238, 238)),
+				condFmtTextContains(sheetID, chapterDataStart, chapterDataEnd, 3, totalCols, "TBD", rgb(239, 154, 154)),
 			)
 		}
 	}
@@ -295,6 +299,31 @@ func condFmtTextEq(sheetID, r0, r1, c0, c1 int64, value string, bg *sheets.Color
 					Condition: &sheets.BooleanCondition{
 						Type:   "TEXT_EQ",
 						Values: []*sheets.ConditionValue{{UserEnteredValue: value}},
+					},
+					Format: &sheets.CellFormat{BackgroundColor: bg},
+				},
+			},
+		},
+	}
+}
+
+// condFmtTextContains returns an AddConditionalFormatRule request that colours cells
+// whose text contains the given substring. Used for mixed-content cells like "Alice, TBD".
+func condFmtTextContains(sheetID, r0, r1, c0, c1 int64, text string, bg *sheets.Color) *sheets.Request {
+	return &sheets.Request{
+		AddConditionalFormatRule: &sheets.AddConditionalFormatRuleRequest{
+			Rule: &sheets.ConditionalFormatRule{
+				Ranges: []*sheets.GridRange{{
+					SheetId:          sheetID,
+					StartRowIndex:    r0,
+					EndRowIndex:      r1,
+					StartColumnIndex: c0,
+					EndColumnIndex:   c1,
+				}},
+				BooleanRule: &sheets.BooleanRule{
+					Condition: &sheets.BooleanCondition{
+						Type:   "TEXT_CONTAINS",
+						Values: []*sheets.ConditionValue{{UserEnteredValue: text}},
 					},
 					Format: &sheets.CellFormat{BackgroundColor: bg},
 				},

@@ -96,7 +96,7 @@ func (h *sheetsHandler) syncSeries(w http.ResponseWriter, r *http.Request) {
 	}
 
 	layout := gsheets.SeriesSheetLayout{
-		CrewCount:    len(data.Crew),
+		CrewCount:    len(data.Crew) + len(data.CrewPlaceholders),
 		TaskCount:    len(data.Tasks),
 		ChapterCount: len(data.Chapters),
 	}
@@ -153,9 +153,12 @@ func buildSeriesGrid(data *sheetdb.SeriesSheetData) [][]interface{} {
 	values = append(values, []interface{}{"Status", data.Status})
 	values = append(values, []interface{}{})
 
-	// Section 1: crew list
+	// Section 1: crew list (assigned members followed by TBD placeholder rows)
 	values = append(values, []interface{}{"User", "Task"})
 	for _, c := range data.Crew {
+		values = append(values, []interface{}{c.UserName, c.TaskName})
+	}
+	for _, c := range data.CrewPlaceholders {
 		values = append(values, []interface{}{c.UserName, c.TaskName})
 	}
 
@@ -184,18 +187,22 @@ func buildSeriesGrid(data *sheetdb.SeriesSheetData) [][]interface{} {
 		row[2] = closedAt
 		taskAssignments := data.Assignments[ch.ID]
 		for _, t := range data.Tasks {
-			entries, ok := taskAssignments[t.ID]
-			if !ok || len(entries) == 0 {
+			entries := taskAssignments[t.ID]
+			placeholderCount := data.Placeholders[ch.ID][t.ID]
+			if len(entries) == 0 && placeholderCount == 0 {
 				row = append(row, "N/A")
 				continue
 			}
-			parts := make([]string, 0, len(entries))
+			parts := make([]string, 0, len(entries)+placeholderCount)
 			for _, e := range entries {
 				if e.Completed {
 					parts = append(parts, "✓ "+e.DisplayName)
 				} else {
 					parts = append(parts, e.DisplayName)
 				}
+			}
+			for i := 0; i < placeholderCount; i++ {
+				parts = append(parts, "TBD")
 			}
 			row = append(row, strings.Join(parts, ", "))
 		}

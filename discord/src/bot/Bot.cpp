@@ -42,6 +42,7 @@
 #include "bot/eventHandlers/commands/list/UserHistory.hpp"
 #include "bot/eventHandlers/commands/manage/Chapter.hpp"
 #include "bot/eventHandlers/commands/manage/Gsheet.hpp"
+#include "bot/eventHandlers/commands/manage/RoleCheck.hpp"
 #include "bot/eventHandlers/commands/manage/Series.hpp"
 #include "bot/eventHandlers/commands/modify/AssignRole.hpp"
 #include "bot/eventHandlers/commands/modify/Demote.hpp"
@@ -154,6 +155,14 @@ void Bot::fillCommandMap() {
       {
           dpp::command_option(dpp::co_sub_command, "enable", "Enable Google Sheets sync"),
           dpp::command_option(dpp::co_sub_command, "disable", "Disable Google Sheets sync"),
+      }};
+
+  m_commands["role-check"] = {
+      "Enable or disable role validation on task assignments",
+      [this](const dpp::slashcommand_t &e) { Commands::roleCheck(*this, e); },
+      {
+          dpp::command_option(dpp::co_sub_command, "enable", "Require users to hold a mapped role before being assigned to a task"),
+          dpp::command_option(dpp::co_sub_command, "disable", "Allow users to be assigned to any task regardless of their roles"),
       }};
 
   m_commands["series"] = {

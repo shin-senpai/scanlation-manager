@@ -219,7 +219,7 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 - `chapter_assignment_placeholders` holds unfilled vacancy slots for a (chapter, task) pair. Each row represents one open slot; multiple rows per pair are allowed. Placeholders are consumed one-by-one when users are assigned (oldest first). Retiring a task deletes all placeholders for it. Series-level `sync_chapters` assignment clears all placeholders for that task in the series.
 - `series_assignment_placeholders` holds unfilled vacancy slots at the series level, analogous to `series_assignments`. When a new chapter is created, one chapter-level placeholder is created per series-level placeholder row for that series. Retiring a task deletes all series-level placeholders for it. A series-level `assign` clears the corresponding series-level and (when `sync_chapters=true`) chapter-level placeholders.
 - `chapters.status` has five values: `in_progress` (active, visible in Todo), `queued` (active but hidden from Todo — indicates a chapter queued behind the current in_progress one), `released`, `hiatus`, `dropped`. The `queued` status is functionally equivalent to `in_progress` for all work operations (assignments, placeholders, work-updates) but is excluded from both the Discord `/todo` command and the GSheet Todo tab. When a new chapter is added and the series already has an `in_progress` chapter, the new chapter is automatically assigned `queued`. When an `in_progress` chapter transitions to `released`/`dropped`/`hiatus`, the next `queued` chapter (lowest number greater than the closing chapter's number) is automatically promoted to `in_progress`.
-- `bot_settings` is a simple `(key TEXT, value TEXT)` store — currently only `gsheet_enabled = "1"` is used
+- `bot_settings` is a simple `(key TEXT, value TEXT)` store — keys in use: `gsheet_enabled = "1"` (toggled via `/gsheet`), `role_check_enabled = "1"` (toggled via `/role-check`)
 - `outstanding_chapter_assignments` (view, migrations 025–029) returns all actionable incomplete assignments: prerequisites satisfied (a prerequisite with no assignment AND no placeholder is ignored; a placeholder counts as a blocker just like an incomplete assignment), chapter is `in_progress` (not `queued`), series is `active`. Used by the Todo sheet backend and referenced conceptually by `/todo` (which does equivalent filtering in-memory)
 
 ---
@@ -487,6 +487,16 @@ Manage command. Requires supermanager.
 - `enable` — verifies `backend_url` and `api_token` are in config, calls `GET /health` then `GET /sheets/health`, stores `gsheet_enabled = "1"` in `bot_settings`
 - `disable` — removes `gsheet_enabled` from `bot_settings`
 
+### /role-check \<enable|disable\>
+Manage command. Requires manager+.
+
+Controls whether users must hold a role mapped to a task (via `/map-role-task`) before they can be assigned to it. Affects `/series assign`, `/series move-assignment`, `/chapter assign`, and `/chapter move-assignment`.
+
+- `enable` — stores `role_check_enabled = "1"` in `bot_settings`; subsequent assignment commands will reject users who lack a capable role
+- `disable` — removes `role_check_enabled` from `bot_settings`; assignments proceed without role validation
+
+**Default:** disabled (absent from `bot_settings`). Role–task mappings (`/map-role-task`) are still stored and used by `/list-role-tasks` regardless of this setting — they just aren't enforced on assignment when the check is off.
+
 ### Work Progress Message Trigger
 Listens in the configured `work_progress_channel`. Parses pipe-delimited messages matching one of these formats:
 ```
@@ -535,5 +545,6 @@ Currently parses and echoes the parsed fields back. No DB write yet.
 | `/series` (add, set-status, assign, unassign, remove, move-assignment, add-placeholder, remove-placeholder) | Done |
 | `/chapter` (add, set-status, assign, unassign, uncomplete, remove, bulk-add, move-assignment, add-placeholder, remove-placeholder) | Done |
 | `/gsheet` (enable, disable) | Done |
+| `/role-check` (enable, disable) | Done |
 | Work progress message trigger | Parses & echoes (no DB write yet) |
 | MangaDex integration (backend) | Stub only — not started |

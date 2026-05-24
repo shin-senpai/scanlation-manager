@@ -6,6 +6,7 @@
 #include "bot/utils/GetAutoCompleteContext.hpp"
 #include "bot/utils/SheetSync.hpp"
 #include "db/DbSession.hpp"
+#include "db/repositories/BotSettings.hpp"
 #include "db/repositories/ChapterAssignmentPlaceholders.hpp"
 #include "db/repositories/ChapterAssignments.hpp"
 #include "db/repositories/Chapters.hpp"
@@ -206,18 +207,21 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
-  const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_target_id);
-  const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
-  bool has_valid_role = false;
-  for(const auto &user_role : user_roles) {
-    if(std::find(capable_roles.begin(), capable_roles.end(), user_role.role_id) != capable_roles.end()) {
-      has_valid_role = true;
-      break;
+  BotSettingsRepository settings_repo;
+  if(settings_repo.get(session.wtx(), "role_check_enabled")) {
+    const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_target_id);
+    const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
+    bool has_valid_role = false;
+    for(const auto &user_role : user_roles) {
+      if(std::find(capable_roles.begin(), capable_roles.end(), user_role.role_id) != capable_roles.end()) {
+        has_valid_role = true;
+        break;
+      }
     }
-  }
-  if(!has_valid_role) {
-    event.edit_original_response(dpp::message("User does not have a Role that allows them to be assigned to **" + task_name + "**"));
-    return;
+    if(!has_valid_role) {
+      event.edit_original_response(dpp::message("User does not have a Role that allows them to be assigned to **" + task_name + "**"));
+      return;
+    }
   }
 
   try {
@@ -479,18 +483,21 @@ void doMoveAssignment(Bot &bot, const dpp::slashcommand_t &event, DbSession &ses
     return;
   }
 
-  const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_to_id);
-  const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
-  bool has_valid_role = false;
-  for(const auto &ur : user_roles) {
-    if(std::find(capable_roles.begin(), capable_roles.end(), ur.role_id) != capable_roles.end()) {
-      has_valid_role = true;
-      break;
+  BotSettingsRepository settings_repo;
+  if(settings_repo.get(session.wtx(), "role_check_enabled")) {
+    const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_to_id);
+    const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
+    bool has_valid_role = false;
+    for(const auto &ur : user_roles) {
+      if(std::find(capable_roles.begin(), capable_roles.end(), ur.role_id) != capable_roles.end()) {
+        has_valid_role = true;
+        break;
+      }
     }
-  }
-  if(!has_valid_role) {
-    event.edit_original_response(dpp::message("To user does not have a role that allows them to be assigned to **" + task_name + "**."));
-    return;
+    if(!has_valid_role) {
+      event.edit_original_response(dpp::message("To user does not have a role that allows them to be assigned to **" + task_name + "**."));
+      return;
+    }
   }
 
   if(!assignments_repo.exists(session.wtx(), *maybe_from_id, maybe_chapter->id, maybe_task->id)) {

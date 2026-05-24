@@ -205,6 +205,106 @@ void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) 
   event.edit_original_response(dpp::message(msg));
 }
 
+void doMoveAssignment(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  SeriesAssignmentsRepository assignments_repo;
+  ChapterAssignmentsRepository chapter_assignments_repo;
+  TasksRepository tasks_repo;
+  RoleTasksRepository role_tasks_repo;
+  DiscordIdentityRepository identity_repo;
+  UserRolesRepository user_roles_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("name"));
+  const dpp::snowflake from_discord_id = std::get<dpp::snowflake>(event.get_parameter("from_user"));
+  const dpp::snowflake to_discord_id = std::get<dpp::snowflake>(event.get_parameter("to_user"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_from_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(from_discord_id));
+  if(!maybe_from_id) {
+    event.edit_original_response(dpp::message("From user is not registered."));
+    return;
+  }
+
+  const auto maybe_to_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(to_discord_id));
+  if(!maybe_to_id) {
+    event.edit_original_response(dpp::message("To user is not registered."));
+    return;
+  }
+
+  if(*maybe_from_id == *maybe_to_id) {
+    event.edit_original_response(dpp::message("Cannot move an assignment to the same user."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_task->retired_at) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** is retired and cannot be assigned."));
+    return;
+  }
+
+  const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_to_id);
+  const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
+  bool has_valid_role = false;
+  for(const auto &ur : user_roles) {
+    if(std::find(capable_roles.begin(), capable_roles.end(), ur.role_id) != capable_roles.end()) {
+      has_valid_role = true;
+      break;
+    }
+  }
+  if(!has_valid_role) {
+    event.edit_original_response(dpp::message("To user does not have a role that allows them to be assigned to **" + task_name + "**."));
+    return;
+  }
+
+  if(!assignments_repo.exists(session.wtx(), *maybe_from_id, maybe_series->id, maybe_task->id)) {
+    event.edit_original_response(dpp::message("<@" + std::to_string(from_discord_id) + "> is not assigned to **" + series_name + "** for **" + task_name + "**."));
+    return;
+  }
+
+  if(assignments_repo.exists(session.wtx(), *maybe_to_id, maybe_series->id, maybe_task->id)) {
+    event.edit_original_response(dpp::message("<@" + std::to_string(to_discord_id) + "> is already assigned to **" + series_name + "** for **" + task_name + "**."));
+    return;
+  }
+
+  bool sync_chapters = true;
+  const auto sync_param = event.get_parameter("sync_chapters");
+  if(const auto *b = std::get_if<bool>(&sync_param)) {
+    sync_chapters = *b;
+  }
+
+  assignments_repo.remove(session.wtx(), *maybe_from_id, maybe_series->id, maybe_task->id);
+  assignments_repo.create(session.wtx(), *maybe_to_id, maybe_series->id, maybe_task->id);
+
+  int removed_count = 0;
+  int added_count = 0;
+  if(sync_chapters) {
+    removed_count = chapter_assignments_repo.removeOutstandingForUserInSeries(session.wtx(), *maybe_from_id, maybe_series->id, maybe_task->id);
+    added_count = chapter_assignments_repo.createForSeriesIfMissing(session.wtx(), *maybe_to_id, maybe_series->id, maybe_task->id);
+  }
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  if(sync_chapters) {
+    SheetSync::syncTodo(bot);
+  }
+
+  std::string msg = "Moved **" + series_name + "** / **" + task_name + "** assignment from <@" + std::to_string(from_discord_id) + "> to <@" + std::to_string(to_discord_id) + ">.";
+  if(sync_chapters) {
+    msg += "\n(Removed from " + std::to_string(removed_count) + " chapter(s); added to " + std::to_string(added_count) + " chapter(s).)";
+  }
+  event.edit_original_response(dpp::message(msg));
+}
+
 void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Permission user_perm) {
   SeriesRepository series_repo;
   ChapterAssignmentsRepository chapter_assignments_repo;
@@ -278,6 +378,8 @@ void Commands::series(Bot &bot, const dpp::slashcommand_t &event) {
       doUnassign(bot, event, session);
     } else if(sub == "remove") {
       doRemove(bot, event, session, user_perm);
+    } else if(sub == "move-assignment") {
+      doMoveAssignment(bot, event, session);
     }
   } catch(const std::exception &e) {
     std::cerr << "series/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
@@ -297,14 +399,14 @@ void Commands::seriesAutocomplete(Bot &bot, const std::string &key, const std::s
     };
     const std::string lower_input = to_lower(input);
 
-    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name" || key == "remove/name") {
+    if(key == "set-status/name" || key == "assign/name" || key == "unassign/name" || key == "remove/name" || key == "move-assignment/name") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
           r.add_autocomplete_choice(dpp::command_option_choice(s.name, s.name));
         }
       }
-    } else if(key == "assign/task" || key == "unassign/task") {
+    } else if(key == "assign/task" || key == "unassign/task" || key == "move-assignment/task") {
       TasksRepository tasks_repo;
       for(const auto &t : tasks_repo.listAll(session.wtx())) {
         if(lower_input.empty() || to_lower(t.name).find(lower_input) != std::string::npos) {

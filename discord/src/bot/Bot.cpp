@@ -181,6 +181,12 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also remove from existing in-progress chapters (default: true)", false)),
           dpp::command_option(dpp::co_sub_command, "remove", "Delete a series and all its chapters")
               .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true)),
+          dpp::command_option(dpp::co_sub_command, "move-assignment", "Move a series assignment from one user to another")
+              .add_option(dpp::command_option(dpp::co_string, "name", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "from_user", "User to move assignment from", true))
+              .add_option(dpp::command_option(dpp::co_user, "to_user", "User to move assignment to", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_boolean, "sync_chapters", "Also move outstanding chapter assignments (default: true)", false)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::seriesAutocomplete(*this, key, input, e);
@@ -224,6 +230,12 @@ void Bot::fillCommandMap() {
           dpp::command_option(dpp::co_sub_command, "bulk-add", "Add multiple chapters to a series at once")
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "chapters", "Chapter numbers (e.g. 51,52,53.5)", true)),
+          dpp::command_option(dpp::co_sub_command, "move-assignment", "Move a chapter assignment from one user to another")
+              .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
+              .add_option(dpp::command_option(dpp::co_user, "from_user", "User to move assignment from", true))
+              .add_option(dpp::command_option(dpp::co_user, "to_user", "User to move assignment to", true))
+              .add_option(dpp::command_option(dpp::co_string, "task", "Task name", true).set_auto_complete(true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::chapterAutocomplete(*this, key, input, e);

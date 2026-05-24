@@ -345,6 +345,100 @@ void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Pe
       "Chapter **" + chapter_name + "** deleted from **" + series_name + "**."));
 }
 
+void doMoveAssignment(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
+  SeriesRepository series_repo;
+  ChaptersRepository chapters_repo;
+  ChapterAssignmentsRepository assignments_repo;
+  TasksRepository tasks_repo;
+  RoleTasksRepository role_tasks_repo;
+  DiscordIdentityRepository identity_repo;
+  UserRolesRepository user_roles_repo;
+
+  const std::string series_name = std::get<std::string>(event.get_parameter("series"));
+  const std::string chapter_name = std::get<std::string>(event.get_parameter("chapter"));
+  const dpp::snowflake from_discord_id = std::get<dpp::snowflake>(event.get_parameter("from_user"));
+  const dpp::snowflake to_discord_id = std::get<dpp::snowflake>(event.get_parameter("to_user"));
+  const std::string task_name = std::get<std::string>(event.get_parameter("task"));
+
+  const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
+  if(!maybe_series) {
+    event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
+  if(!maybe_chapter) {
+    event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  const auto maybe_from_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(from_discord_id));
+  if(!maybe_from_id) {
+    event.edit_original_response(dpp::message("From user is not registered."));
+    return;
+  }
+
+  const auto maybe_to_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(to_discord_id));
+  if(!maybe_to_id) {
+    event.edit_original_response(dpp::message("To user is not registered."));
+    return;
+  }
+
+  if(*maybe_from_id == *maybe_to_id) {
+    event.edit_original_response(dpp::message("Cannot move an assignment to the same user."));
+    return;
+  }
+
+  const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
+  if(!maybe_task) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_task->retired_at) {
+    event.edit_original_response(dpp::message("Task **" + task_name + "** is retired and cannot be assigned."));
+    return;
+  }
+
+  const auto user_roles = user_roles_repo.listByUser(session.wtx(), *maybe_to_id);
+  const auto capable_roles = role_tasks_repo.listRoleIdsByTask(session.wtx(), maybe_task->id);
+  bool has_valid_role = false;
+  for(const auto &ur : user_roles) {
+    if(std::find(capable_roles.begin(), capable_roles.end(), ur.role_id) != capable_roles.end()) {
+      has_valid_role = true;
+      break;
+    }
+  }
+  if(!has_valid_role) {
+    event.edit_original_response(dpp::message("To user does not have a role that allows them to be assigned to **" + task_name + "**."));
+    return;
+  }
+
+  if(!assignments_repo.exists(session.wtx(), *maybe_from_id, maybe_chapter->id, maybe_task->id)) {
+    event.edit_original_response(dpp::message("<@" + std::to_string(from_discord_id) + "> is not assigned to **" + chapter_name + "** for **" + task_name + "**."));
+    return;
+  }
+
+  if(assignments_repo.exists(session.wtx(), *maybe_from_id, maybe_chapter->id, maybe_task->id, true)) {
+    event.edit_original_response(dpp::message("That assignment is already completed and cannot be moved."));
+    return;
+  }
+
+  if(assignments_repo.exists(session.wtx(), *maybe_to_id, maybe_chapter->id, maybe_task->id)) {
+    event.edit_original_response(dpp::message("<@" + std::to_string(to_discord_id) + "> is already assigned to **" + chapter_name + "** for **" + task_name + "**."));
+    return;
+  }
+
+  assignments_repo.remove(session.wtx(), *maybe_from_id, maybe_chapter->id, maybe_task->id);
+  assignments_repo.create(session.wtx(), *maybe_to_id, maybe_chapter->id, maybe_task->id);
+  session.commit();
+  SheetSync::syncSeries(bot, series_name);
+  SheetSync::syncTodo(bot);
+
+  event.edit_original_response(dpp::message(
+      "Moved **" + chapter_name + "** / **" + task_name + "** assignment from <@" + std::to_string(from_discord_id) + "> to <@" + std::to_string(to_discord_id) + ">."));
+}
+
 void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   SeriesRepository series_repo;
   ChaptersRepository chapters_repo;
@@ -459,6 +553,8 @@ void Commands::chapter(Bot &bot, const dpp::slashcommand_t &event) {
       doRemove(bot, event, session, user_perm);
     } else if(sub == "bulk-add") {
       doBulkAdd(bot, event, session);
+    } else if(sub == "move-assignment") {
+      doMoveAssignment(bot, event, session);
     }
   } catch(const std::exception &e) {
     std::cerr << "chapter/" << sub << " failed for user (" << discord_id << "): " << e.what() << std::endl;
@@ -479,7 +575,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
     const std::string lower_input = to_lower(input);
 
     // Series name options
-    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series" || key == "bulk-add/series") {
+    if(key == "add/series" || key == "set-status/series" || key == "assign/series" || key == "unassign/series" || key == "uncomplete/series" || key == "remove/series" || key == "bulk-add/series" || key == "move-assignment/series") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.wtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {
@@ -488,7 +584,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
       }
     }
     // Chapter name options — filters based on the already-typed series
-    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter") {
+    else if(key == "set-status/chapter" || key == "assign/chapter" || key == "unassign/chapter" || key == "uncomplete/chapter" || key == "remove/chapter" || key == "move-assignment/chapter") {
       const std::string series_ctx = BotUtils::getAutoCompleteContext(event, "series");
       if(!series_ctx.empty()) {
         SeriesRepository series_repo;
@@ -505,7 +601,7 @@ void Commands::chapterAutocomplete(Bot &bot, const std::string &key, const std::
       }
     }
     // Task name options
-    else if(key == "assign/task" || key == "unassign/task" || key == "uncomplete/task") {
+    else if(key == "assign/task" || key == "unassign/task" || key == "uncomplete/task" || key == "move-assignment/task") {
       TasksRepository tasks_repo;
       for(const auto &t : tasks_repo.listAll(session.wtx())) {
         if(lower_input.empty() || to_lower(t.name).find(lower_input) != std::string::npos) {

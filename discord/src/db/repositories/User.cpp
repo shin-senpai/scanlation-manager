@@ -64,6 +64,24 @@ std::optional<User> UserRepository::findById(pqxx::transaction_base &txn, int id
       static_cast<Permission>(result[0]["permission_level"].as<int>())};
 }
 
+std::optional<User> UserRepository::findByDisplayName(pqxx::transaction_base &txn, const std::string &display_name) {
+  auto result = txn.exec(
+      "SELECT id, name, display_name, joined_at, left_at, permission_level FROM users WHERE display_name = $1 LIMIT 1",
+      pqxx::params(txn, display_name));
+
+  if(result.empty()) {
+    return std::nullopt;
+  }
+
+  return User{
+      result[0]["id"].as<int>(),
+      result[0]["name"].is_null() ? std::nullopt : std::make_optional(result[0]["name"].as<std::string>()),
+      result[0]["display_name"].as<std::string>(),
+      result[0]["joined_at"].as<std::string>(),
+      result[0]["left_at"].is_null() ? std::nullopt : std::make_optional(result[0]["left_at"].as<std::string>()),
+      static_cast<Permission>(result[0]["permission_level"].as<int>())};
+}
+
 void UserRepository::setPermissionLevel(pqxx::transaction_base &txn, int id, Permission permission_level) {
   txn.exec(
       "UPDATE users SET permission_level = $2 WHERE id = $1",
@@ -76,4 +94,10 @@ Permission UserRepository::getPermissionLevel(pqxx::transaction_base &txn, int i
       pqxx::params(txn, id));
 
   return static_cast<Permission>(result[0]["permission_level"].as<int>());
+}
+
+void UserRepository::updateDisplayName(pqxx::transaction_base &txn, int id, const std::string &display_name) {
+  txn.exec(
+      "UPDATE users SET display_name = $2 WHERE id = $1",
+      pqxx::params(txn, id, display_name));
 }

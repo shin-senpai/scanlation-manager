@@ -27,6 +27,8 @@ scanlation-manager/
 | ✅ | `/set-progress-channel` — Designate a channel for work progress messages |
 | ✅ | `/set-staff-role` — Set the Discord role required to use the bot; auto-registers all current members with that role |
 | ✅ | `/set-alias` — Set a display alias for release credits |
+| ✅ | `/set-display-name` — Change your display name; manager+ can change another user's |
+| ✅ | `/role-check` — Enable or disable role-capability validation on task assignments (manager+) |
 | ✅ | `/add-role` — Create a scanlation role |
 | ✅ | `/add-task` — Create a task type with an ordering level |
 | ✅ | `/sync-role` — Bulk-map a Discord role to an app role and assign it to all registered members who have it |
@@ -79,7 +81,7 @@ discord/
 │       │   └── triggers/
 │       │       └── WorkProgress.cpp
 │       └── utils/
-│           ├── SheetSync.cpp                      # Fire-and-forget Sheets sync (syncSeries, syncTodo, deleteSeries)
+│           ├── SheetSync.cpp                      # Fire-and-forget Sheets sync (syncSeries, syncTodo, syncSeriesList, syncSeriesAndList, deleteSeries)
 │           ├── ChannelUtils.cpp
 │           ├── DateUtils.cpp
 │           └── GetAutoCompleteContext.cpp
@@ -94,7 +96,7 @@ discord/
 │   │   ├── Tasks, TaskDependencies
 │   │   ├── Series, SeriesAssignments, SeriesAssignmentPlaceholders
 │   │   ├── Chapters, ChapterAssignments, ChapterAssignmentPlaceholders
-│   │   └── BotSettings                           # Runtime key-value config (gsheet_enabled)
+│   │   └── BotSettings                           # Runtime key-value config (gsheet_enabled, role_check_enabled)
 │   └── utils/
 │       └── PqxxErrors.hpp / PqxxErrors.cpp        # Constraint name extraction from pqxx exceptions
 ├── models/                                        # Plain data structs (no logic)
@@ -187,6 +189,8 @@ The first user to run `/register` is automatically granted Supermanager.
 | `/register` (self) | Bot access (no registration required) |
 | `/register [user]` | Manager |
 | `/set-alias` | Standard (registered) |
+| `/set-display-name` (self) | Standard (registered) |
+| `/set-display-name [user]` | Manager |
 | `/work-update` | Standard (registered) |
 | `/bulk-work-update` | Standard (registered; manager+ to mark for another user) |
 | `/todo` (self) | Standard (registered) |
@@ -200,10 +204,12 @@ The first user to run `/register` is automatically granted Supermanager.
 | `/list-series` | Standard (registered) |
 | `/list-chapters` | Standard (registered) |
 | `/info user` (self) | Standard (registered) |
+| `/info user [discord_user]` | Manager |
 | `/info user [user]` | Manager |
 | `/info series` | Manager |
 | `/info chapter` | Manager |
 | `/set-progress-channel` | Manager |
+| `/role-check` | Manager |
 | `/add-role` | Manager |
 | `/add-task` | Manager |
 | `/sync-role` | Manager |
@@ -252,6 +258,21 @@ Sets the Discord role that gates bot access. Persisted to `config.json`. After u
 
 ### `/set-alias [alias]`
 Sets a display alias for the calling user, used in release credits. Enforces uniqueness across active users.
+
+### `/set-display-name [name] [user?]`
+Changes a user's display name (the name shown in sheet credits, `/info`, and `/todo` output).
+
+- Only printable non-space ASCII characters (codepoints 33–126) are kept; spaces, control characters, DEL, and non-ASCII are all stripped. If the result is empty after stripping, the command is rejected.
+- With no `user` argument: changes your own display name.
+- With `user` (manager+): changes the specified Discord user's display name.
+
+### `/role-check [enable|disable]`
+Toggles role-capability validation on task assignments globally. Manager+.
+
+- **`enable`** — Requires that users hold a role mapped to a task before they can be assigned to it (via `/series assign`, `/series move-assignment`, `/chapter assign`, `/chapter move-assignment`). Stores `role_check_enabled = "1"` in `bot_settings`.
+- **`disable`** — Removes the restriction. Assignment commands no longer validate role membership. Removes `role_check_enabled` from `bot_settings`.
+
+Role checking is **disabled by default**. The setting persists across bot restarts.
 
 ### `/add-role [name]`
 Creates a new scanlation role (e.g. `TL`, `QC`, `PR`). Name is normalised to uppercase. Manager+.
@@ -309,7 +330,7 @@ Multi-subcommand for managing series. Manager+.
 
 - **`add [name]`** — Create a new series.
 - **`set-status [name] [status]`** — Update series status (`active`, `hiatus`, `completed`, `dropped`).
-- **`assign [name] [user] [task] [sync_chapters?]`** — Add a user to the series' default crew for a task. The user must hold a role mapped to that task. New chapters automatically inherit these assignments. Also clears the series-level placeholder for that task. When `sync_chapters` is `true` (default), also adds the assignment to every existing non-released chapter in the series that the user isn't already assigned to, and clears chapter-level placeholders for that task in the series.
+- **`assign [name] [user] [task] [sync_chapters?]`** — Add a user to the series' default crew for a task. When role checking is enabled (see `/role-check`), the user must hold a role mapped to that task. New chapters automatically inherit these assignments. Also clears the series-level placeholder for that task. When `sync_chapters` is `true` (default), also adds the assignment to every existing non-released chapter in the series that the user isn't already assigned to, and clears chapter-level placeholders for that task in the series.
 - **`unassign [name] [user] [task] [sync_chapters?]`** — Remove a user from the default crew. When `sync_chapters` is `true` (default), also removes their outstanding (not yet completed) chapter assignments across all non-released chapters in the series. Completed assignments are never removed.
 - **`remove [name]`** — Delete a series and all its chapters. Manager can remove series with no completed assignments; Supermanager can remove any (completed assignments are cleared first to bypass the immutability trigger).
 - **`add-placeholder [name] [task] [sync_chapters?]`** — Add a series-level vacancy slot indicating that staff is needed for this task. Blocked if the task is retired. When `sync_chapters` is `true` (default), also creates one chapter-level placeholder per non-released chapter in the series.
@@ -320,7 +341,7 @@ Multi-subcommand for managing chapters. Manager+.
 
 - **`add [series] [number] [name?] [volume?]`** — Add a chapter. Automatically creates chapter assignments from the series' default crew.
 - **`set-status [series] [chapter] [status]`** — Update chapter status (`in_progress`, `queued`, `released`, `hiatus`, `dropped`).
-- **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a task. The user must hold a role mapped to that task. Automatically consumes one placeholder vacancy for that slot if any exist.
+- **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a task. When role checking is enabled (see `/role-check`), the user must hold a role mapped to that task. Automatically consumes one placeholder vacancy for that slot if any exist.
 - **`unassign [series] [chapter] [user] [task]`** — Remove an outstanding assignment. Cannot remove a completed assignment — use `uncomplete` first.
 - **`uncomplete [series] [chapter] [user] [task]`** — Mark a completed assignment as outstanding again. Only allowed when the chapter status is `in_progress`.
 - **`remove [series] [chapter]`** — Delete a chapter and all its assignments. Manager can remove chapters with no completed assignments; Supermanager can remove any.
@@ -350,7 +371,7 @@ Deep-dive view for a single entity. Autocomplete on all name fields.
 
 - **`series [name]`** — Series status, default crew grouped by task, and up to 15 chapters with task completion. Manager+.
 - **`chapter [series] [chapter]`** — Chapter metadata and all assignments grouped by task, marked ✅ (with completion date) or ⬜ (outstanding). Manager+.
-- **`user [user?]`** — User profile: display name, alias, permission level, linked Discord, active series, and total series worked. Omitting `user` shows your own profile; manager+ to view others.
+- **`user [discord_user?] [user?]`** — User profile: display name, alias, permission level, linked Discord, active series, and total series worked. Omitting both arguments shows your own profile. Manager+ can look up another user by passing either `discord_user` (Discord user picker) or `user` (internal display name — autocomplete). The two parameters are mutually exclusive.
 
 ### `/promote [user]`
 Promotes a user one permission level: Standard → Manager → Supermanager. Supermanager only.
@@ -424,4 +445,6 @@ StaffName|<#channelId>|ChapterNumber|Task|NextRole
 - `ConnectionPool` is thread-safe. Callers construct `DbSession session(bot.getPool())` — provides `wtx()` (write transaction) and `rtx()` (read transaction). `session.commit()` commits; the destructor releases the connection back to the pool.
 - `CurlGlobalManager::curlManagerInit()` must be called once at startup before any HTTP calls.
 - The `i_guild_members` privileged intent must be enabled in the Discord Developer Portal for `/set-staff-role` and `/sync-role` to populate the guild member cache.
-- Google Sheets sync calls (`SheetSync::syncSeries`, `syncTodo`, `deleteSeries`) are fire-and-forget — they run in a detached thread after `session.commit()`, log errors to stderr, and never propagate failures to the user.
+- Google Sheets sync calls are fire-and-forget — they run in a detached thread after `session.commit()`, log errors to stderr, and never propagate failures to the user. `SheetSync` exposes five functions: `syncSeries` (rewrites a named series tab; deletes it if the series is not active), `syncTodo` (rewrites the Todo tab), `syncSeriesList` (rewrites the "Series" overview tab), `syncSeriesAndList` (calls `syncSeries` then `syncSeriesList` sequentially in one thread — used on series add/set-status to avoid a race where the list sync runs before the tab exists), and `deleteSeries` (removes a series tab).
+- The **"Series" overview tab** lists every series (Name, Status, Added At, Closed At), regardless of status. Active series names are written as `=HYPERLINK(...)` formulas linking to their individual series tab. Status cells are conditionally formatted: Active=green, Completed=blue, Hiatus=orange, Dropped=pink. Individual series tabs are only created for `active` series — tabs for non-active series are deleted on next `syncSeries` call.
+- The `queued` chapter status indicates a chapter that is ready to be worked on next but should not appear in the Todo list until the preceding `in_progress` chapter is released. When a new chapter is added and the series already has an `in_progress` chapter, the new chapter is automatically set to `queued`. When an `in_progress` chapter transitions to `released`, `dropped`, or `hiatus`, the next `queued` chapter (by number) is automatically promoted to `in_progress`.

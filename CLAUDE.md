@@ -358,6 +358,13 @@ Add command. Registers the calling user (or a target Discord user if manager+). 
 ### /set-alias \<alias\>
 Modify command. Sets the caller's active display name alias (used in credits). Retires the previous alias.
 
+### /set-display-name \<name\> [user]
+Modify command. Changes a user's `display_name` (the name shown throughout the bot).
+
+- Any registered user can change their own display name.
+- Managers can pass `user` (Discord user picker) to change another user's display name.
+- The `name` input is sanitized before saving: only printable non-space ASCII characters (codepoints 33–126) are kept; spaces, control characters, DEL, and non-ASCII are all stripped. If the result is empty after stripping, the command is rejected with an error.
+
 ### /set-progress-channel \<channel\>
 Modify command. Stores the channel ID in `config.json` via `ConfigManager`. Requires manager+.
 
@@ -428,7 +435,13 @@ List command. Lists series with optional status filter.
 List command. Lists chapters in a series with optional status filter.
 
 ### /info \<user\>
-List command. Shows a user's stats (total series count, recent history). Requires manager+ to view other users.
+List command. Shows a user's stats (total series count, recent history).
+
+The `user` subcommand accepts two optional, mutually exclusive parameters for looking up other users (both require manager+; omitting both defaults to the caller):
+- `discord_user` — Discord user picker; resolves via `discord_identities`
+- `user` — internal user picker by display name (autocomplete from all `users.display_name` values); resolves via exact `display_name` match
+
+Providing both at once returns an error.
 
 ### /todo [user]
 List command. Shows the calling user's outstanding actionable assignments (prerequisites met). Only shows assignments from `active` series and `in_progress` chapters — `queued` chapters are excluded. Managers can pass a `user` parameter to view someone else's list. Uses in-memory dependency resolution against all incomplete assignments in the relevant chapters (equivalent logic to the `outstanding_chapter_assignments` view but applied per-user in the bot).
@@ -516,6 +529,7 @@ Currently parses and echoes the parsed fields back. No DB write yet.
 | `/set-progress-channel` | Done |
 | `/set-staff-role` | Done |
 | `/set-alias` | Done |
+| `/set-display-name` | Done |
 | `/promote` | Done |
 | `/demote` | Done |
 | `/add-role` | Done |

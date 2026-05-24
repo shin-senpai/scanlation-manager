@@ -25,7 +25,12 @@ public:
 
   std::optional<User> findById(pqxx::transaction_base &txn, int id);
 
+  // Returns the first user whose display_name matches exactly (case-sensitive).
+  std::optional<User> findByDisplayName(pqxx::transaction_base &txn, const std::string &display_name);
+
   void setPermissionLevel(pqxx::transaction_base &txn, int id, Permission permission_level);
 
   Permission getPermissionLevel(pqxx::transaction_base &txn, int id);
+
+  void updateDisplayName(pqxx::transaction_base &txn, int id, const std::string &display_name);
 };

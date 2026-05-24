@@ -49,6 +49,7 @@
 #include "bot/eventHandlers/commands/modify/Promote.hpp"
 #include "bot/eventHandlers/commands/modify/RetireTask.hpp"
 #include "bot/eventHandlers/commands/modify/SetAlias.hpp"
+#include "bot/eventHandlers/commands/modify/SetDisplayName.hpp"
 #include "bot/eventHandlers/commands/modify/SetProgressChannel.hpp"
 #include "bot/eventHandlers/commands/modify/SetStaffRole.hpp"
 #include "bot/eventHandlers/commands/modify/UnretireTask.hpp"
@@ -106,6 +107,12 @@ void Bot::fillCommandMap() {
       "Set the alias that you want to use for credit",
       [this](const dpp::slashcommand_t &e) { Commands::setAlias(*this, e); },
       {dpp::command_option(dpp::co_string, "alias", "The Credit Name you want to use", true)}};
+
+  m_commands["set-display-name"] = {
+      "Change your display name (spaces and non-ASCII characters are stripped)",
+      [this](const dpp::slashcommand_t &e) { Commands::setDisplayName(*this, e); },
+      {dpp::command_option(dpp::co_string, "name", "New display name (spaces and non-ASCII stripped)", true),
+       dpp::command_option(dpp::co_user, "user", "User to update (manager+ only, defaults to yourself)", false)}};
 
   m_commands["add-role"] = {
       "Create a new scanlation role",
@@ -386,7 +393,8 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_string, "series", "Series name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true)),
           dpp::command_option(dpp::co_sub_command, "user", "Show profile info for a user")
-              .add_option(dpp::command_option(dpp::co_user, "user", "User to look up (defaults to yourself, manager+ for others)", false)),
+              .add_option(dpp::command_option(dpp::co_user, "discord_user", "Discord user to look up (manager+ for others)", false))
+              .add_option(dpp::command_option(dpp::co_string, "user", "Internal user to look up by display name (manager+ only)", false).set_auto_complete(true)),
       },
       [this](const std::string &key, const std::string &input, const dpp::autocomplete_t &e) {
         Commands::infoAutocomplete(*this, key, input, e);

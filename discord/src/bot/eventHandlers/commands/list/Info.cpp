@@ -189,12 +189,25 @@ void doUserInfo(const dpp::slashcommand_t &event, DbSession &session, int caller
   UserAliasesRepository alias_repo;
   ChapterAssignmentsRepository chapter_assignments_repo;
 
-  int resolved_user_id;
-  const auto &user_param = event.get_parameter("user");
+  // Resolve which user to look up. discord_user and user are mutually exclusive.
+  const auto &discord_user_param = event.get_parameter("discord_user");
   dpp::snowflake target_snowflake{};
-  if(const auto *p = std::get_if<dpp::snowflake>(&user_param)) {
+  if(const auto *p = std::get_if<dpp::snowflake>(&discord_user_param)) {
     target_snowflake = *p;
   }
+
+  std::string internal_user_name;
+  const auto &internal_user_param = event.get_parameter("user");
+  if(const auto *p = std::get_if<std::string>(&internal_user_param)) {
+    internal_user_name = *p;
+  }
+
+  if(!target_snowflake.empty() && !internal_user_name.empty()) {
+    event.edit_original_response(dpp::message("Please specify only one of `discord_user` or `user`, not both."));
+    return;
+  }
+
+  int resolved_user_id;
   if(!target_snowflake.empty()) {
     if(caller_permission < Permission::manager) {
       event.edit_original_response(dpp::message("You lack the permission to view other users info."));
@@ -206,6 +219,17 @@ void doUserInfo(const dpp::slashcommand_t &event, DbSession &session, int caller
       return;
     }
     resolved_user_id = *maybe_target;
+  } else if(!internal_user_name.empty()) {
+    if(caller_permission < Permission::manager) {
+      event.edit_original_response(dpp::message("You lack the permission to view other users info."));
+      return;
+    }
+    const auto maybe_target = user_repo.findByDisplayName(session.rtx(), internal_user_name);
+    if(!maybe_target) {
+      event.edit_original_response(dpp::message("No user found with display name **" + internal_user_name + "**."));
+      return;
+    }
+    resolved_user_id = maybe_target->id;
   } else {
     resolved_user_id = caller_user_id;
   }
@@ -318,7 +342,14 @@ void Commands::infoAutocomplete(Bot &bot, const std::string &key, const std::str
     };
     const std::string lower_input = to_lower(input);
 
-    if(key == "series/name" || key == "chapter/series") {
+    if(key == "user/user") {
+      UserRepository user_repo;
+      for(const auto &u : user_repo.listUsers(session.rtx())) {
+        if(lower_input.empty() || to_lower(u.display_name).find(lower_input) != std::string::npos) {
+          r.add_autocomplete_choice(dpp::command_option_choice(u.display_name, u.display_name));
+        }
+      }
+    } else if(key == "series/name" || key == "chapter/series") {
       SeriesRepository series_repo;
       for(const auto &s : series_repo.list(session.rtx())) {
         if(lower_input.empty() || to_lower(s.name).find(lower_input) != std::string::npos) {

@@ -107,9 +107,10 @@ Construct `DbSession session(bot.getPool())` at the start of each handler:
 ### Google Sheets Sync
 Mutations that affect sheet-visible data fire sync calls to the backend after committing. These are fire-and-forget (detached thread, errors logged to stderr, never propagated to the user).
 
-`SheetSync` (`include/bot/utils/SheetSync.hpp`) provides three functions:
-- `SheetSync::syncSeries(bot, series_name)` — rewrites the named series sheet tab
+`SheetSync` (`include/bot/utils/SheetSync.hpp`) provides four functions:
+- `SheetSync::syncSeries(bot, series_name)` — rewrites the named series sheet tab (only active series get tabs; non-active series have their tab deleted)
 - `SheetSync::syncTodo(bot)` — rewrites the Todo sheet tab
+- `SheetSync::syncSeriesList(bot)` — rewrites the "Series" overview tab
 - `SheetSync::deleteSeries(bot, series_name)` — removes the series sheet tab
 
 Sync only fires when both `backend_url` and `api_token` are set in config **and** `gsheet_enabled = "1"` exists in the `bot_settings` DB table (toggled via `/gsheet enable`/`disable`).
@@ -118,11 +119,11 @@ Call placement after `session.commit()`:
 
 | Command | Sync calls |
 |---------|-----------|
-| `/series add` | `syncSeries` |
-| `/series set-status` | `syncSeries` + `syncTodo` |
+| `/series add` | `syncSeries` + `syncSeriesList` |
+| `/series set-status` | `syncSeries` + `syncTodo` + `syncSeriesList` |
 | `/series assign` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
 | `/series unassign` | `syncSeries` + `syncTodo` (when `sync_chapters` fires) |
-| `/series remove` | `deleteSeries` + `syncTodo` |
+| `/series remove` | `deleteSeries` + `syncTodo` + `syncSeriesList` |
 | `/chapter add` | `syncSeries` + `syncTodo` |
 | `/chapter set-status` | `syncSeries` + `syncTodo` |
 | `/chapter assign` | `syncSeries` + `syncTodo` |
@@ -289,7 +290,8 @@ All routes require `Authorization: Bearer <api_token>`.
 | `GET` | `/health` | Backend liveness + auth check (200 if token valid) |
 | `GET` | `/sheets/health` | Sheets API connectivity check |
 | `POST` | `/sheets/sync/todo` | Rewrites the `"Todo"` sheet tab from `outstanding_chapter_assignments` view |
-| `POST` | `/sheets/sync/series` | Body: `{"name":"..."}` — rewrites the named series sheet tab |
+| `POST` | `/sheets/sync/series` | Body: `{"name":"..."}` — rewrites the named series sheet tab (deletes tab if series is not active) |
+| `POST` | `/sheets/sync/series-list` | Rewrites the `"Series"` overview tab |
 | `POST` | `/sheets/delete-series` | Body: `{"name":"..."}` — deletes the named series sheet tab |
 | `GET` | `/drive/folders/{folderID}` | Lists files in a Google Drive folder |
 | `GET` | `/drive/files/{fileID}` | Downloads a file from Google Drive |
@@ -308,7 +310,14 @@ All routes require `Authorization: Bearer <api_token>`.
 - `Days Active` is written as a Google Sheets formula `=INT(TODAY()-DATE(Y,M,D))` where the date is `GREATEST(assigned_at, latest_prereq_completion)` fetched from the DB — the cell recalculates live every day without a sync
 - Sorted: series name → chapter number → task level (NULLS LAST) → task name → assignee
 
-**Series sheet** (one tab per series, tab named after the series):
+**Series overview sheet** (tab name: `"Series"`):
+- Columns: `Series Name | Status | Added At | Closed At`
+- One row per series, ordered by name; all series appear regardless of status
+- `Closed At` is `N/A` if `series.closed_at IS NULL`
+- Active series names are written as `=HYPERLINK(url, name)` formulas linking to their individual series tab
+- Status column is conditionally formatted: Active=green, Completed=blue, Hiatus=orange, Dropped=pink
+
+**Series sheet** (one tab per active series, tab named after the series — only created for `active` series; tabs for non-active series are deleted on next `syncSeries` call):
 ```
 Status  | <Active|Completed|Hiatus|Dropped>
 (blank)
@@ -434,11 +443,11 @@ Manage command. Requires manager+.
 
 | Subcommand | Description |
 |-----------|-------------|
-| `add <name>` | Creates the series; fires `syncSeries` |
-| `set-status <name> <status>` | Updates status (`active`/`completed`/`hiatus`/`dropped`); fires `syncSeries` + `syncTodo` |
+| `add <name>` | Creates the series; fires `syncSeries` + `syncSeriesList` |
+| `set-status <name> <status>` | Updates status (`active`/`completed`/`hiatus`/`dropped`); fires `syncSeries` + `syncTodo` + `syncSeriesList`. When set to non-active, the individual series tab is deleted by `syncSeries`. |
 | `assign <name> <user> <task> [sync_chapters]` | **Series must be `active`.** Adds a series-level crew assignment (validates user has a capable role). Consumes one series-level placeholder slot for that task if any exist. When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them, and consumes one chapter-level placeholder per chapter for that task. Fires `syncSeries` + `syncTodo` (if synced). |
 | `unassign <name> <user> <task> [sync_chapters]` | **Series must be `active`.** Removes a series-level crew assignment. When `sync_chapters` is true (default), also removes outstanding (not completed) chapter assignments for that user+task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
-| `remove <name>` | Deletes the series and all chapters. If completed assignments exist, requires supermanager (clears `completed_at` first to bypass immutability trigger); fires `deleteSeries` + `syncTodo` |
+| `remove <name>` | Deletes the series and all chapters. If completed assignments exist, requires supermanager (clears `completed_at` first to bypass immutability trigger); fires `deleteSeries` + `syncTodo` + `syncSeriesList` |
 | `add-placeholder <name> <task> [sync_chapters]` | **Series must be `active`.** Adds one series-level vacancy slot for the task. When `sync_chapters` is true (default), also creates one chapter-level placeholder per non-released chapter in the series. Blocked if the task is retired. Fires `syncSeries` + `syncTodo` (if synced). |
 | `remove-placeholder <name> <task> [sync_chapters]` | **Series must be `active`.** Removes all series-level placeholder slots for the task. Reports an error if none exist. When `sync_chapters` is true (default), also removes all chapter-level placeholders for that task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 

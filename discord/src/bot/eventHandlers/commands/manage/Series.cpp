@@ -39,7 +39,7 @@ void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
   try {
     const int id = series_repo.create(session.wtx(), name);
     session.commit();
-    SheetSync::syncSeries(bot, name);
+    SheetSync::syncSeriesAndList(bot, name);
     event.edit_original_response(dpp::message("Series **" + name + "** created with ID `" + std::to_string(id) + "`."));
   } catch(const pqxx::unique_violation &) {
     event.edit_original_response(dpp::message("A series with that name already exists."));
@@ -60,8 +60,8 @@ void doSetStatus(Bot &bot, const dpp::slashcommand_t &event, DbSession &session)
 
   series_repo.updateStatus(session.wtx(), maybe_series->id, seriesStatusFromString(status_str));
   session.commit();
-  SheetSync::syncSeries(bot, name);
   SheetSync::syncTodo(bot);
+  SheetSync::syncSeriesAndList(bot, name);
 
   event.edit_original_response(dpp::message("Series **" + name + "** status set to **" + status_str + "**."));
 }
@@ -360,6 +360,7 @@ void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Pe
   session.commit();
   SheetSync::deleteSeries(bot, series_name);
   SheetSync::syncTodo(bot);
+  SheetSync::syncSeriesList(bot);
 
   event.edit_original_response(dpp::message(
       "Series **" + series_name + "** and all its chapters have been deleted."));

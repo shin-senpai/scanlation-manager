@@ -120,6 +120,115 @@ func (c *Client) DeleteSheet(ctx context.Context, name string) error {
 	return nil
 }
 
+// GetSheetURLs returns a map of sheet-tab-name → full hyperlink URL for each of the
+// given names that has an existing tab in the spreadsheet. Names without a tab are
+// omitted from the result. The URL format is the standard Google Sheets deep-link:
+// https://docs.google.com/spreadsheets/d/{spreadsheetID}/edit#gid={sheetID}
+func (c *Client) GetSheetURLs(ctx context.Context, names []string) (map[string]string, error) {
+	if len(names) == 0 {
+		return map[string]string{}, nil
+	}
+	sp, err := c.srv.Spreadsheets.Get(c.spreadsheetID).Context(ctx).
+		Fields("sheets(properties(sheetId,title))").Do()
+	if err != nil {
+		return nil, fmt.Errorf("get spreadsheet metadata: %w", err)
+	}
+	want := make(map[string]struct{}, len(names))
+	for _, n := range names {
+		want[n] = struct{}{}
+	}
+	result := make(map[string]string)
+	for _, sh := range sp.Sheets {
+		title := sh.Properties.Title
+		if _, ok := want[title]; ok {
+			result[title] = fmt.Sprintf(
+				"https://docs.google.com/spreadsheets/d/%s/edit#gid=%d",
+				c.spreadsheetID, sh.Properties.SheetId)
+		}
+	}
+	return result, nil
+}
+
+// FormatSeriesListSheet applies visual formatting to the "Series" overview tab:
+// a bold dark-blue header row and colour-coded status cells.
+func (c *Client) FormatSeriesListSheet(ctx context.Context, name string, rowCount int) error {
+	sp, err := c.srv.Spreadsheets.Get(c.spreadsheetID).Context(ctx).
+		Fields("sheets(properties(sheetId,title),conditionalFormats)").Do()
+	if err != nil {
+		return fmt.Errorf("get spreadsheet metadata: %w", err)
+	}
+	sheetID := int64(-1)
+	var cfRuleCount int
+	for _, sh := range sp.Sheets {
+		if sh.Properties.Title == name {
+			sheetID = sh.Properties.SheetId
+			cfRuleCount = len(sh.ConditionalFormats)
+			break
+		}
+	}
+	if sheetID < 0 {
+		return fmt.Errorf("sheet %q not found", name)
+	}
+
+	var reqs []*sheets.Request
+
+	// Delete stale conditional format rules.
+	for i := cfRuleCount - 1; i >= 0; i-- {
+		reqs = append(reqs, &sheets.Request{
+			DeleteConditionalFormatRule: &sheets.DeleteConditionalFormatRuleRequest{
+				SheetId: sheetID,
+				Index:   int64(i),
+			},
+		})
+	}
+
+	// Wipe all user-entered formatting.
+	reqs = append(reqs, &sheets.Request{
+		RepeatCell: &sheets.RepeatCellRequest{
+			Range:  &sheets.GridRange{SheetId: sheetID},
+			Cell:   &sheets.CellData{UserEnteredFormat: &sheets.CellFormat{}},
+			Fields: "userEnteredFormat",
+		},
+	})
+
+	// Header row (row 0).
+	reqs = append(reqs, repeatCell(sheetID, 0, 1, 0, 4, headerCellFormat(), "userEnteredFormat(backgroundColor,textFormat)"))
+
+	// Date columns (Added At = col 2, Closed At = col 3): apply yyyy-mm-dd format so
+	// Sheets displays the date serial as text rather than a raw integer.
+	if rowCount > 0 {
+		dataEnd := int64(1 + rowCount)
+		dateFmt := &sheets.CellFormat{
+			NumberFormat: &sheets.NumberFormat{Type: "DATE", Pattern: "yyyy-mm-dd"},
+		}
+		reqs = append(reqs, repeatCell(sheetID, 1, dataEnd, 2, 4, dateFmt, "userEnteredFormat.numberFormat"))
+	}
+
+	// Status column (col 1) colour by value for data rows.
+	if rowCount > 0 {
+		dataEnd := int64(1 + rowCount)
+		for _, sc := range []struct {
+			value string
+			color *sheets.Color
+		}{
+			{"Active", rgb(200, 230, 201)},
+			{"Completed", rgb(187, 222, 251)},
+			{"Hiatus", rgb(255, 224, 178)},
+			{"Dropped", rgb(255, 205, 210)},
+		} {
+			reqs = append(reqs, condFmtTextEq(sheetID, 1, dataEnd, 1, 2, sc.value, sc.color))
+		}
+	}
+
+	_, err = c.srv.Spreadsheets.BatchUpdate(c.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: reqs,
+	}).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("format series list sheet %q: %w", name, err)
+	}
+	return nil
+}
+
 // SeriesSheetLayout describes the number of rows in each section of a series sheet,
 // which is needed to compute cell ranges for formatting.
 type SeriesSheetLayout struct {

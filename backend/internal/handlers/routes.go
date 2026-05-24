@@ -35,6 +35,7 @@ func RegisterRoutes(mux *http.ServeMux, gdriveSvc *gdrive.Service, s3Svc *s3.Ser
 		mux.HandleFunc("GET /sheets/health", sh.health)
 		mux.HandleFunc("POST /sheets/sync/todo", sh.syncTodo)
 		mux.HandleFunc("POST /sheets/sync/series", sh.syncSeries)
+		mux.HandleFunc("POST /sheets/sync/series-list", sh.syncSeriesList)
 		mux.HandleFunc("POST /sheets/delete-series", sh.deleteSeries)
 	}
 }

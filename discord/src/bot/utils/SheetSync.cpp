@@ -68,6 +68,36 @@ void SheetSync::syncTodo(Bot &bot) {
   fireAndForget(cfg->url, cfg->token, "/sheets/sync/todo", "{}");
 }
 
+void SheetSync::syncSeriesList(Bot &bot) {
+  const auto cfg = loadConfig(bot);
+  if(!cfg) {
+    return;
+  }
+  fireAndForget(cfg->url, cfg->token, "/sheets/sync/series-list", "{}");
+}
+
+void SheetSync::syncSeriesAndList(Bot &bot, const std::string &series_name) {
+  const auto cfg = loadConfig(bot);
+  if(!cfg) {
+    return;
+  }
+  // Run both calls sequentially in one thread so syncSeriesList sees the tab
+  // that syncSeries just created (avoids a race where the new tab doesn't exist
+  // yet when GetSheetURLs runs).
+  const std::string url = cfg->url;
+  const std::string token = cfg->token;
+  const std::string body = "{\"name\":\"" + series_name + "\"}";
+  std::thread([url, token, body]() {
+    try {
+      std::string buf;
+      httpPost(url + "/sheets/sync/series", {"Authorization: Bearer " + token, "Content-Type: application/json"}, body, buf);
+      httpPost(url + "/sheets/sync/series-list", {"Authorization: Bearer " + token, "Content-Type: application/json"}, "{}", buf);
+    } catch(const std::exception &e) {
+      std::cerr << "SheetSync: syncSeriesAndList failed: " << e.what() << std::endl;
+    }
+  }).detach();
+}
+
 void SheetSync::deleteSeries(Bot &bot, const std::string &series_name) {
   const auto cfg = loadConfig(bot);
   if(!cfg) {

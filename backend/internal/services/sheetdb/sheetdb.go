@@ -330,6 +330,51 @@ func (c *Client) GetSeriesSheetData(ctx context.Context, seriesName string) (*Se
 	return data, phRows.Err()
 }
 
+// SeriesRow is one row in the Series overview sheet.
+type SeriesRow struct {
+	Name     string
+	Status   string // "Active", "Completed", "Hiatus", "Dropped"
+	AddedAt  string // YYYY-MM-DD
+	ClosedAt string // YYYY-MM-DD, or "" when NULL (caller renders as "N/A")
+}
+
+// GetSeriesListData returns all series ordered by name, with display-friendly status strings.
+func (c *Client) GetSeriesListData(ctx context.Context) ([]SeriesRow, error) {
+	const q = `
+		SELECT name,
+		       CASE status
+		           WHEN 'active'    THEN 'Active'
+		           WHEN 'completed' THEN 'Completed'
+		           WHEN 'hiatus'    THEN 'Hiatus'
+		           WHEN 'dropped'   THEN 'Dropped'
+		           ELSE status
+		       END,
+		       TO_CHAR(added_at, 'YYYY-MM-DD'),
+		       TO_CHAR(closed_at, 'YYYY-MM-DD')
+		FROM series
+		ORDER BY name`
+
+	rows, err := c.pool.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("query series list: %w", err)
+	}
+	defer rows.Close()
+
+	var result []SeriesRow
+	for rows.Next() {
+		var r SeriesRow
+		var closedAt *string
+		if err := rows.Scan(&r.Name, &r.Status, &r.AddedAt, &closedAt); err != nil {
+			return nil, fmt.Errorf("scan series row: %w", err)
+		}
+		if closedAt != nil {
+			r.ClosedAt = *closedAt
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
 // formatChapterLabel builds the display label for a chapter row.
 // Format: "Vol.X Ch.Y" if volume is set, else "Ch.Y". Appends name if present.
 func formatChapterLabel(number float64, name *string, volume *int64) string {

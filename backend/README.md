@@ -22,7 +22,7 @@ backend/
 │   │   ├── s3/
 │   │   │   └── s3.go             # S3-compatible client (list, download, upload, delete)
 │   │   ├── gsheets/
-│   │   │   └── gsheets.go        # Google Sheets client (ClearAndWrite, DeleteSheet, IsHealthy)
+│   │   │   └── gsheets.go        # Google Sheets client (ClearAndWrite, DeleteSheet, IsHealthy, GetSheetURLs, FormatSeriesSheet, FormatSeriesListSheet)
 │   │   ├── sheetdb/
 │   │   │   └── sheetdb.go        # PostgreSQL reader for sheet sync data
 │   │   └── mangadex/
@@ -98,7 +98,8 @@ All routes require `Authorization: Bearer <api_token>`.
 |--------|------|-------------|
 | `GET` | `/sheets/health` | Sheets API connectivity check |
 | `POST` | `/sheets/sync/todo` | Rewrites the `"Todo"` sheet tab from DB state |
-| `POST` | `/sheets/sync/series` | Body: `{"name":"..."}` — rewrites the named series sheet tab |
+| `POST` | `/sheets/sync/series` | Body: `{"name":"..."}` — rewrites the named series sheet tab (deletes tab if series is not active) |
+| `POST` | `/sheets/sync/series-list` | Rewrites the `"Series"` overview tab (all series, with hyperlinks for active ones) |
 | `POST` | `/sheets/delete-series` | Body: `{"name":"..."}` — deletes the named series sheet tab |
 
 ### Google Drive

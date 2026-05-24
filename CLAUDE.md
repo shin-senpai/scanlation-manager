@@ -203,6 +203,7 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 028_add_chapter_assignment_placeholders.sql   — chapter_assignment_placeholders table: unfilled vacancy slots per (chapter, task); surrogate PK allows N placeholders per slot
 029_placeholders_block_dependencies.sql       — Replaces view: placeholder on a prerequisite task now blocks dependent tasks (same as an incomplete assignment)
 030_add_series_assignment_placeholders.sql    — series_assignment_placeholders table: unfilled vacancy slots per (series, task); cascades to chapter-level placeholders on new chapter creation
+031_add_queued_chapter_status.sql             — chapters.status gains 'queued': a hidden-from-todo "next up" status
 ```
 
 ### Key Schema Notes
@@ -216,8 +217,9 @@ docker exec -i scanlation-db-1 psql -U scanlation_manager -d scanlation_manager 
 - Deleting a series or chapter cascades to child records; completed assignments must be cleared before deletion (the application handles this in the supermanager path before calling `remove()`)
 - `chapter_assignment_placeholders` holds unfilled vacancy slots for a (chapter, task) pair. Each row represents one open slot; multiple rows per pair are allowed. Placeholders are consumed one-by-one when users are assigned (oldest first). Retiring a task deletes all placeholders for it. Series-level `sync_chapters` assignment clears all placeholders for that task in the series.
 - `series_assignment_placeholders` holds unfilled vacancy slots at the series level, analogous to `series_assignments`. When a new chapter is created, one chapter-level placeholder is created per series-level placeholder row for that series. Retiring a task deletes all series-level placeholders for it. A series-level `assign` clears the corresponding series-level and (when `sync_chapters=true`) chapter-level placeholders.
+- `chapters.status` has five values: `in_progress` (active, visible in Todo), `queued` (active but hidden from Todo — indicates a chapter queued behind the current in_progress one), `released`, `hiatus`, `dropped`. The `queued` status is functionally equivalent to `in_progress` for all work operations (assignments, placeholders, work-updates) but is excluded from both the Discord `/todo` command and the GSheet Todo tab. When a new chapter is added and the series already has an `in_progress` chapter, the new chapter is automatically assigned `queued`. When an `in_progress` chapter transitions to `released`/`dropped`/`hiatus`, the next `queued` chapter (lowest number greater than the closing chapter's number) is automatically promoted to `in_progress`.
 - `bot_settings` is a simple `(key TEXT, value TEXT)` store — currently only `gsheet_enabled = "1"` is used
-- `outstanding_chapter_assignments` (view, migrations 025–029) returns all actionable incomplete assignments: prerequisites satisfied (a prerequisite with no assignment AND no placeholder is ignored; a placeholder counts as a blocker just like an incomplete assignment), chapter is `in_progress`, series is `active`. Used by the Todo sheet backend and referenced conceptually by `/todo` (which does equivalent filtering in-memory)
+- `outstanding_chapter_assignments` (view, migrations 025–029) returns all actionable incomplete assignments: prerequisites satisfied (a prerequisite with no assignment AND no placeholder is ignored; a placeholder counts as a blocker just like an incomplete assignment), chapter is `in_progress` (not `queued`), series is `active`. Used by the Todo sheet backend and referenced conceptually by `/todo` (which does equivalent filtering in-memory)
 
 ---
 
@@ -420,7 +422,7 @@ List command. Lists chapters in a series with optional status filter.
 List command. Shows a user's stats (total series count, recent history). Requires manager+ to view other users.
 
 ### /todo [user]
-List command. Shows the calling user's outstanding actionable assignments (prerequisites met). Managers can pass a `user` parameter to view someone else's list. Uses in-memory dependency resolution against all incomplete assignments in the relevant chapters (equivalent logic to the `outstanding_chapter_assignments` view but applied per-user in the bot).
+List command. Shows the calling user's outstanding actionable assignments (prerequisites met). Only shows assignments from `active` series and `in_progress` chapters — `queued` chapters are excluded. Managers can pass a `user` parameter to view someone else's list. Uses in-memory dependency resolution against all incomplete assignments in the relevant chapters (equivalent logic to the `outstanding_chapter_assignments` view but applied per-user in the bot).
 
 ### /user-history \<user\> [series]
 List command. Shows completed assignments for a user, optionally filtered to a series.
@@ -428,43 +430,47 @@ List command. Shows completed assignments for a user, optionally filtered to a s
 ### /series \<subcommand\>
 Manage command. Requires manager+.
 
+**Note:** `assign`, `unassign`, `add-placeholder`, `remove-placeholder`, and `move-assignment` are blocked when the series is not `active`. The user is prompted to set the series status to Active first.
+
 | Subcommand | Description |
 |-----------|-------------|
 | `add <name>` | Creates the series; fires `syncSeries` |
 | `set-status <name> <status>` | Updates status (`active`/`completed`/`hiatus`/`dropped`); fires `syncSeries` + `syncTodo` |
-| `assign <name> <user> <task> [sync_chapters]` | Adds a series-level crew assignment (validates user has a capable role). Clears the series-level placeholder for that task (all slots). When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them, and clears chapter-level placeholders for that task across those chapters. Fires `syncSeries` + `syncTodo` (if synced). |
-| `unassign <name> <user> <task> [sync_chapters]` | Removes a series-level crew assignment. When `sync_chapters` is true (default), also removes outstanding (not completed) chapter assignments for that user+task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
+| `assign <name> <user> <task> [sync_chapters]` | **Series must be `active`.** Adds a series-level crew assignment (validates user has a capable role). Consumes one series-level placeholder slot for that task if any exist. When `sync_chapters` is true (default), also assigns the user to every non-released chapter in the series that doesn't already have them, and consumes one chapter-level placeholder per chapter for that task. Fires `syncSeries` + `syncTodo` (if synced). |
+| `unassign <name> <user> <task> [sync_chapters]` | **Series must be `active`.** Removes a series-level crew assignment. When `sync_chapters` is true (default), also removes outstanding (not completed) chapter assignments for that user+task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 | `remove <name>` | Deletes the series and all chapters. If completed assignments exist, requires supermanager (clears `completed_at` first to bypass immutability trigger); fires `deleteSeries` + `syncTodo` |
-| `add-placeholder <name> <task> [sync_chapters]` | Adds one series-level vacancy slot for the task. When `sync_chapters` is true (default), also creates one chapter-level placeholder per non-released chapter in the series. Blocked if the task is retired. Fires `syncSeries` + `syncTodo` (if synced). |
-| `remove-placeholder <name> <task> [sync_chapters]` | Removes all series-level placeholder slots for the task. Reports an error if none exist. When `sync_chapters` is true (default), also removes all chapter-level placeholders for that task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
+| `add-placeholder <name> <task> [sync_chapters]` | **Series must be `active`.** Adds one series-level vacancy slot for the task. When `sync_chapters` is true (default), also creates one chapter-level placeholder per non-released chapter in the series. Blocked if the task is retired. Fires `syncSeries` + `syncTodo` (if synced). |
+| `remove-placeholder <name> <task> [sync_chapters]` | **Series must be `active`.** Removes all series-level placeholder slots for the task. Reports an error if none exist. When `sync_chapters` is true (default), also removes all chapter-level placeholders for that task across all non-released chapters. Fires `syncSeries` + `syncTodo` (if synced). |
 
 ### /chapter \<subcommand\>
 Manage command. Requires manager+.
 
+**Note:** All mutating subcommands (`add`, `bulk-add`, `remove`, `assign`, `unassign`, `add-placeholder`, `remove-placeholder`, `move-assignment`, `uncomplete`) are blocked when the series is not `active`. For `assign`, `unassign`, `add-placeholder`, `remove-placeholder`, `move-assignment`, and `uncomplete` there is a second check: the chapter status must be `in_progress` or `queued`. The series check fires first; if it passes, the chapter status check fires next.
+
 | Subcommand | Description |
 |-----------|-------------|
-| `add <series> <number> [name] [volume]` | Creates chapter; copies series-level crew assignments as chapter assignments; fires `syncSeries` + `syncTodo` |
-| `set-status <series> <chapter> <status>` | Updates status (`in_progress`/`released`/`dropped`/`hiatus`); fires `syncSeries` + `syncTodo` |
-| `assign <series> <chapter> <user> <task>` | Adds a chapter assignment (validates user has a capable role); consumes one placeholder for that slot if any exist; fires `syncSeries` + `syncTodo` |
-| `unassign <series> <chapter> <user> <task>` | Removes outstanding assignment (blocked if already completed); fires `syncSeries` + `syncTodo` |
-| `uncomplete <series> <chapter> <user> <task>` | Clears `completed_at` on a completed assignment (chapter must be `in_progress`); fires `syncSeries` + `syncTodo` |
-| `remove <series> <chapter>` | Deletes the chapter. Requires supermanager if completed assignments exist; fires `syncSeries` + `syncTodo` |
-| `bulk-add <series> <chapters>` | Adds multiple chapters at once; `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`); copies series-level crew to each; skips numbers that already exist; fires `syncSeries` + `syncTodo` if any chapter was created |
-| `add-placeholder <series> <chapter> <task>` | Adds one unfilled vacancy slot for (chapter, task). Multiple placeholders per slot are supported. Appears as red `TBD` in the series sheet. Blocked if task is retired. Fires `syncSeries` + `syncTodo`. |
-| `remove-placeholder <series> <chapter> <task>` | Removes **all** placeholder slots for (chapter, task). Reports an error if none exist. Fires `syncSeries` + `syncTodo`. |
+| `add <series> <number> [name] [volume]` | **Series must be `active`.** Creates chapter; copies series-level crew assignments as chapter assignments; fires `syncSeries` + `syncTodo`. If the series already has an `in_progress` chapter the new chapter defaults to `queued`; otherwise it defaults to `in_progress`. |
+| `set-status <series> <chapter> <status>` | Updates status (`in_progress`/`queued`/`released`/`dropped`/`hiatus`); fires `syncSeries` + `syncTodo`. When set to `released`, `dropped`, or `hiatus`, automatically promotes the next `queued` chapter in the series (by number) to `in_progress`. |
+| `assign <series> <chapter> <user> <task>` | **Series must be `active`. Chapter must be `in_progress` or `queued`.** Adds a chapter assignment (validates user has a capable role); consumes one placeholder for that slot if any exist; fires `syncSeries` + `syncTodo` |
+| `unassign <series> <chapter> <user> <task>` | **Series must be `active`. Chapter must be `in_progress` or `queued`.** Removes outstanding assignment (blocked if already completed); fires `syncSeries` + `syncTodo` |
+| `uncomplete <series> <chapter> <user> <task>` | **Series must be `active`. Chapter must be `in_progress` or `queued`.** Clears `completed_at` on a completed assignment; fires `syncSeries` + `syncTodo` |
+| `remove <series> <chapter>` | **Series must be `active`.** Deletes the chapter. Requires supermanager if completed assignments exist; fires `syncSeries` + `syncTodo` |
+| `bulk-add <series> <chapters>` | **Series must be `active`.** Adds multiple chapters at once; `chapters` is a comma-separated list of numbers (e.g. `51,52,53.5`); copies series-level crew to each; skips numbers that already exist; fires `syncSeries` + `syncTodo` if any chapter was created. If the series has no `in_progress` chapter, the first (lowest-numbered) new chapter is created as `in_progress` and the rest as `queued`; if one already exists, all new chapters are created as `queued`. |
+| `add-placeholder <series> <chapter> <task>` | **Series must be `active`. Chapter must be `in_progress` or `queued`.** Adds one unfilled vacancy slot for (chapter, task). Multiple placeholders per slot are supported. Appears as red `TBD` in the series sheet. Blocked if task is retired. Fires `syncSeries` + `syncTodo`. |
+| `remove-placeholder <series> <chapter> <task>` | **Series must be `active`. Chapter must be `in_progress` or `queued`.** Removes **all** placeholder slots for (chapter, task). Reports an error if none exist. Fires `syncSeries` + `syncTodo`. |
 
 ### /work-update \<series\> \<chapter\> \<task\> [user]
 Modify command. Marks a chapter assignment complete for the calling user (or a target user, if manager+).
 - Checks that the assignment exists and is not already completed
 - Checks that all task dependencies are satisfied for this chapter
 - If dependents exist: pings assignees of tasks that are now **fully unblocked** (all their dependencies complete) — tasks still blocked by other prerequisites are not pinged
-- If no incomplete assignments remain **and no placeholder slots exist**: auto-sets the chapter status to `released`
+- If no incomplete assignments remain **and no placeholder slots exist**: auto-sets the chapter status to `released`, then automatically promotes the next `queued` chapter in the series (by number) to `in_progress`
 - Fires `syncSeries` + `syncTodo`
 
 ### /bulk-work-update \<series\> \<task\> \<chapters\> [user]
 Modify command. Marks a task complete across multiple chapters in one command. `chapters` is a comma-separated list of chapter numbers (e.g. `51,52,53.5`). Input is normalized and validated before any DB write.
 - All chapters are validated first (exists, assigned, not already complete, no blocking dependencies) — if any fail the entire command is aborted with a per-chapter error report
-- On success: marks all complete, pings assignees of tasks now fully unblocked (deduplicated across chapters), auto-releases chapters with no remaining incomplete assignments **and no placeholder slots**
+- On success: marks all complete, pings assignees of tasks now fully unblocked (deduplicated across chapters), auto-releases chapters with no remaining incomplete assignments **and no placeholder slots**, and for each auto-released chapter promotes the next `queued` chapter in the series to `in_progress`
 - Fires `syncSeries` + `syncTodo`
 
 ### /gsheet \<enable|disable\>

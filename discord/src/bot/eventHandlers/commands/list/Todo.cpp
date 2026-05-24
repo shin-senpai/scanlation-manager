@@ -13,9 +13,12 @@
 #include "db/repositories/Tasks.hpp"
 #include "db/repositories/User.hpp"
 #include "models/ModelChapterAssignment.hpp"
+#include "types/ChapterStatus.hpp"
 #include "types/Permission.hpp"
+#include "types/SeriesStatus.hpp"
 
 // Standard Includes
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
@@ -133,20 +136,33 @@ void Commands::todo(Bot &bot, const dpp::slashcommand_t event) {
 
     auto next_in_line = resolveNextInLineAssignments(std::move(user_incomplete_assignments), task_deps_map, all_incomplete_assignments);
 
+    std::unordered_map<int, Chapter> chapter_map;
+    for(auto &c : chapters_repo.listBySeriesIds(session.rtx(), series)) {
+      chapter_map.emplace(c.id, std::move(c));
+    }
+
+    std::unordered_map<int, std::string> series_name_map;
+    std::unordered_set<int> active_series_ids;
+    for(const auto &s : series_repo.list(session.rtx())) {
+      series_name_map[s.id] = s.name;
+      if(s.status == SeriesStatus::active) {
+        active_series_ids.insert(s.id);
+      }
+    }
+
+    // Only show assignments from in_progress chapters in active series.
+    next_in_line.erase(
+        std::remove_if(next_in_line.begin(), next_in_line.end(), [&](const ChapterAssignment &a) {
+          const auto it = chapter_map.find(a.chapter_id);
+          if(it == chapter_map.end()) return true;
+          return it->second.status != ChapterStatus::in_progress || !active_series_ids.count(it->second.series_id);
+        }),
+        next_in_line.end());
+
     if(next_in_line.empty()) {
       const bool is_self = !target_discord_id || target_discord_id == event.command.usr.id;
       event.edit_original_response(dpp::message(is_self ? "You have no pending tasks." : "That user has no pending tasks."));
       return;
-    }
-
-    std::unordered_map<int, std::string> series_name_map;
-    for(const auto &s : series_repo.list(session.rtx())) {
-      series_name_map[s.id] = s.name;
-    }
-
-    std::unordered_map<int, Chapter> chapter_map;
-    for(auto &c : chapters_repo.listBySeriesIds(session.rtx(), series)) {
-      chapter_map.emplace(c.id, std::move(c));
     }
 
     std::unordered_map<int, std::string> task_name_map;

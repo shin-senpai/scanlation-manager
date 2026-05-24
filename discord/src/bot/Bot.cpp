@@ -214,6 +214,7 @@ void Bot::fillCommandMap() {
               .add_option(dpp::command_option(dpp::co_string, "chapter", "Chapter name", true).set_auto_complete(true))
               .add_option(dpp::command_option(dpp::co_string, "status", "New status", true)
                               .add_choice(dpp::command_option_choice("In Progress", std::string("in_progress")))
+                              .add_choice(dpp::command_option_choice("Queued", std::string("queued")))
                               .add_choice(dpp::command_option_choice("Released", std::string("released")))
                               .add_choice(dpp::command_option_choice("Hiatus", std::string("hiatus")))
                               .add_choice(dpp::command_option_choice("Dropped", std::string("dropped")))),

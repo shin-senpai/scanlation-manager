@@ -16,7 +16,11 @@
 
 class ChaptersRepository {
 public:
-  int create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name = std::nullopt, std::optional<int> volume = std::nullopt);
+  int create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name = std::nullopt, std::optional<int> volume = std::nullopt, ChapterStatus status = ChapterStatus::in_progress);
+
+  // Returns the ID of the lowest-numbered chapter after `after_number` in the series
+  // that has `queued` status, or nullopt if none exists.
+  std::optional<int> findNextQueuedId(pqxx::transaction_base &txn, int series_id, double after_number);
 
   std::optional<Chapter> findById(pqxx::transaction_base &txn, int id);
 

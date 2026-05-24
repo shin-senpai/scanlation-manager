@@ -144,7 +144,12 @@ Individual chapters belonging to a series.
 | `closed_at` | `TIMESTAMPTZ` | Yes | — | `NULL` = still in progress |
 
 **Check constraints:**
-- `chapters_status_check`: `status IN ('in_progress', 'released', 'dropped', 'hiatus')`
+- `chapters_status_check`: `status IN ('in_progress', 'queued', 'released', 'dropped', 'hiatus')`
+
+**Chapter status semantics:**
+- `in_progress` — actively being worked on; assignments appear in `/todo` and the GSheet Todo tab
+- `queued` — next in line behind the current `in_progress` chapter; all work operations (assign, unassign, placeholder, work-update, uncomplete) function identically to `in_progress`, but the chapter is **excluded** from `/todo` and the GSheet Todo tab so staff do not see future work prematurely. When a new chapter is added to a series that already has an `in_progress` chapter it defaults to `queued`. When the `in_progress` chapter closes (manually via `set-status` or automatically on last work-update), the lowest-numbered `queued` chapter in the series is automatically promoted to `in_progress`.
+- `released` / `dropped` / `hiatus` — closed states; `closed_at` is set to `NOW()` on transition into these states
 
 **Unique constraints:**
 - `chapters_series_id_name_key` on `(series_id, name)` — display names are unique within a series

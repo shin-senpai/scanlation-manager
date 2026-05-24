@@ -141,6 +141,10 @@ void Commands::workProgress(Bot &bot, const dpp::slashcommand_t &event) {
     if(assignments_repo.listByChapter(session.wtx(), maybe_chapter->id, std::nullopt, false).empty()
        && !placeholder_repo.existsForChapter(session.wtx(), maybe_chapter->id)) {
       chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, ChapterStatus::released);
+      const auto next_queued_id = chapters_repo.findNextQueuedId(session.wtx(), maybe_chapter->series_id, maybe_chapter->number);
+      if(next_queued_id) {
+        chapters_repo.updateStatus(session.wtx(), *next_queued_id, ChapterStatus::in_progress);
+      }
     }
     session.commit();
     SheetSync::syncSeries(bot, series_name);

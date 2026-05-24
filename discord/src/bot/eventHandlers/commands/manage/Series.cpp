@@ -85,6 +85,12 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
   if(!maybe_target_id) {
     event.edit_original_response(dpp::message("That user is not registered."));
@@ -169,6 +175,12 @@ void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) 
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_target_id = identity_repo.findUserIdByDiscordId(session.wtx(), static_cast<int64_t>(target_discord_id));
   if(!maybe_target_id) {
     event.edit_original_response(dpp::message("That user is not registered."));
@@ -230,6 +242,12 @@ void doMoveAssignment(Bot &bot, const dpp::slashcommand_t &event, DbSession &ses
   const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
   if(!maybe_series) {
     event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
     return;
   }
 
@@ -362,6 +380,12 @@ void doAddPlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &ses
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_task = tasks_repo.findByName(session.wtx(), task_name);
   if(!maybe_task) {
     event.edit_original_response(dpp::message("Task **" + task_name + "** does not exist."));
@@ -419,6 +443,12 @@ void doRemovePlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &
   const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
   if(!maybe_series) {
     event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
     return;
   }
 

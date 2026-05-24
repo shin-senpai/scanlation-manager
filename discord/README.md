@@ -319,7 +319,7 @@ Multi-subcommand for managing series. Manager+.
 Multi-subcommand for managing chapters. Manager+.
 
 - **`add [series] [number] [name?] [volume?]`** — Add a chapter. Automatically creates chapter assignments from the series' default crew.
-- **`set-status [series] [chapter] [status]`** — Update chapter status (`in_progress`, `released`, `hiatus`, `dropped`).
+- **`set-status [series] [chapter] [status]`** — Update chapter status (`in_progress`, `queued`, `released`, `hiatus`, `dropped`).
 - **`assign [series] [chapter] [user] [task]`** — Assign a user to a chapter for a task. The user must hold a role mapped to that task. Automatically consumes one placeholder vacancy for that slot if any exist.
 - **`unassign [series] [chapter] [user] [task]`** — Remove an outstanding assignment. Cannot remove a completed assignment — use `uncomplete` first.
 - **`uncomplete [series] [chapter] [user] [task]`** — Mark a completed assignment as outstanding again. Only allowed when the chapter status is `in_progress`.

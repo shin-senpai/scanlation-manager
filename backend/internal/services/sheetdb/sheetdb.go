@@ -234,6 +234,7 @@ func (c *Client) GetSeriesSheetData(ctx context.Context, seriesName string) (*Se
 		SELECT id, number, name, volume,
 		       CASE status
 		           WHEN 'in_progress' THEN 'In Progress'
+		           WHEN 'queued'      THEN 'Queued'
 		           WHEN 'released'    THEN 'Released'
 		           WHEN 'hiatus'      THEN 'Hiatus'
 		           WHEN 'dropped'     THEN 'Dropped'

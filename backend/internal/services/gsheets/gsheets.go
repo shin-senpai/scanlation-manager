@@ -219,6 +219,7 @@ func (c *Client) FormatSeriesSheet(ctx context.Context, name string, l SeriesShe
 		}{
 			{"Released", rgb(200, 230, 201)},
 			{"In Progress", rgb(255, 249, 196)},
+			{"Queued", rgb(187, 222, 251)},
 			{"Hiatus", rgb(255, 224, 178)},
 			{"Dropped", rgb(255, 205, 210)},
 		}

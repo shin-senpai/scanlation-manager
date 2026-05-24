@@ -18,10 +18,10 @@ Chapter rowToChapter(const pqxx::row &row) {
 }
 } // namespace
 
-int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name, std::optional<int> volume) {
+int ChaptersRepository::create(pqxx::transaction_base &txn, int series_id, double number, std::optional<std::string> name, std::optional<int> volume, ChapterStatus status) {
   auto result = txn.exec(
-      "INSERT INTO chapters (series_id, number, name, volume) VALUES ($1, $2, $3, $4) RETURNING id",
-      pqxx::params(txn, series_id, number, name, volume));
+      "INSERT INTO chapters (series_id, number, name, volume, status) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+      pqxx::params(txn, series_id, number, name, volume, chapterStatusToString(status)));
 
   return result[0]["id"].as<int>();
 }
@@ -131,8 +131,19 @@ std::optional<Chapter> ChaptersRepository::findByDisplayKey(pqxx::transaction_ba
 
 void ChaptersRepository::updateStatus(pqxx::transaction_base &txn, int id, ChapterStatus status) {
   txn.exec(
-      "UPDATE chapters SET status = $2, closed_at = CASE WHEN $2 IN ('in_progress', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",
+      "UPDATE chapters SET status = $2, closed_at = CASE WHEN $2 IN ('in_progress', 'queued', 'hiatus') THEN NULL ELSE NOW() END WHERE id = $1",
       pqxx::params(txn, id, chapterStatusToString(status)));
+}
+
+std::optional<int> ChaptersRepository::findNextQueuedId(pqxx::transaction_base &txn, int series_id, double after_number) {
+  const auto result = txn.exec(
+      "SELECT id FROM chapters WHERE series_id = $1 AND number > $2 AND status = 'queued'"
+      " ORDER BY number ASC LIMIT 1",
+      pqxx::params(txn, series_id, after_number));
+  if(result.empty()) {
+    return std::nullopt;
+  }
+  return result[0][0].as<int>();
 }
 
 void ChaptersRepository::remove(pqxx::transaction_base &txn, int chapter_id) {

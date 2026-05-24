@@ -19,6 +19,7 @@
 #include "db/repositories/UserRoles.hpp"
 #include "types/ChapterStatus.hpp"
 #include "types/Permission.hpp"
+#include "types/SeriesStatus.hpp"
 
 // User Defined Utils
 #include "bot/utils/ParseChapterNumbers.hpp"
@@ -81,10 +82,20 @@ void doAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before adding chapters."));
+    return;
+  }
+
   const auto default_assignments = series_assignments_repo.listBySeries(session.wtx(), maybe_series->id);
 
+  // Default to queued if an in_progress chapter already exists in the series.
+  const bool has_in_progress = !chapters_repo.listBySeries(session.wtx(), maybe_series->id, ChapterStatus::in_progress).empty();
+  const ChapterStatus initial_status = has_in_progress ? ChapterStatus::queued : ChapterStatus::in_progress;
+
   try {
-    const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, number, name, volume);
+    const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, number, name, volume, initial_status);
     for(const auto &assignment : default_assignments) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
     }
@@ -122,7 +133,16 @@ void doSetStatus(Bot &bot, const dpp::slashcommand_t &event, DbSession &session)
     return;
   }
 
-  chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, chapterStatusFromString(status_str));
+  const ChapterStatus new_status = chapterStatusFromString(status_str);
+  chapters_repo.updateStatus(session.wtx(), maybe_chapter->id, new_status);
+  // When a chapter is closed (released/dropped/hiatus), promote the next queued
+  // chapter in line (lowest number > this one with queued status) to in_progress.
+  if(new_status == ChapterStatus::released || new_status == ChapterStatus::dropped || new_status == ChapterStatus::hiatus) {
+    const auto next_id = chapters_repo.findNextQueuedId(session.wtx(), maybe_series->id, maybe_chapter->number);
+    if(next_id) {
+      chapters_repo.updateStatus(session.wtx(), *next_id, ChapterStatus::in_progress);
+    }
+  }
   session.commit();
   SheetSync::syncSeries(bot, series_name);
   SheetSync::syncTodo(bot);
@@ -151,9 +171,21 @@ void doAssign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before modifying assignments."));
     return;
   }
 
@@ -221,9 +253,21 @@ void doUnassign(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) 
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before modifying assignments."));
     return;
   }
 
@@ -276,15 +320,21 @@ void doUncomplete(Bot &bot, const dpp::slashcommand_t &event, DbSession &session
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
     return;
   }
 
-  if(maybe_chapter->status != ChapterStatus::in_progress) {
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
     event.edit_original_response(dpp::message(
-        "Chapter **" + chapter_name + "** is not in progress. Set it back to in-progress before uncompleting assignments."));
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before uncompleting assignments."));
     return;
   }
 
@@ -325,6 +375,12 @@ void doRemove(Bot &bot, const dpp::slashcommand_t &event, DbSession &session, Pe
   const auto maybe_series = series_repo.findByName(session.wtx(), series_name);
   if(!maybe_series) {
     event.edit_original_response(dpp::message("Series **" + series_name + "** does not exist."));
+    return;
+  }
+
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying chapters."));
     return;
   }
 
@@ -377,9 +433,21 @@ void doMoveAssignment(Bot &bot, const dpp::slashcommand_t &event, DbSession &ses
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before modifying assignments."));
     return;
   }
 
@@ -474,8 +542,20 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before adding chapters."));
+    return;
+  }
+
   const auto default_assignments = series_assignments_repo.listBySeries(session.wtx(), maybe_series->id);
   const auto placeholder_task_ids = series_placeholder_repo.listTaskIdsBySeries(session.wtx(), maybe_series->id);
+
+  // Determine initial statuses. If the series already has an in_progress chapter,
+  // all new chapters are queued. Otherwise, the first (lowest-numbered) new chapter
+  // gets in_progress and the rest get queued.
+  const bool series_has_in_progress = !chapters_repo.listBySeries(session.wtx(), maybe_series->id, ChapterStatus::in_progress).empty();
+  bool first_chapter_assigned = series_has_in_progress;
 
   std::vector<double> created_nums;
   std::vector<double> skipped_nums;
@@ -485,7 +565,9 @@ void doBulkAdd(Bot &bot, const dpp::slashcommand_t &event, DbSession &session) {
       skipped_nums.push_back(num);
       continue;
     }
-    const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, num);
+    const ChapterStatus ch_status = first_chapter_assigned ? ChapterStatus::queued : ChapterStatus::in_progress;
+    first_chapter_assigned = true;
+    const int chapter_id = chapters_repo.create(session.wtx(), maybe_series->id, num, std::nullopt, std::nullopt, ch_status);
     for(const auto &assignment : default_assignments) {
       chapter_assignments_repo.create(session.wtx(), assignment.user_id, chapter_id, assignment.task_id);
     }
@@ -544,9 +626,21 @@ void doAddPlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &ses
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before modifying assignments."));
     return;
   }
 
@@ -587,9 +681,21 @@ void doRemovePlaceholder(Bot &bot, const dpp::slashcommand_t &event, DbSession &
     return;
   }
 
+  if(maybe_series->status != SeriesStatus::active) {
+    event.edit_original_response(dpp::message(
+        "Series **" + series_name + "** is not active. Set its status to Active before modifying assignments."));
+    return;
+  }
+
   const auto maybe_chapter = chapters_repo.findByDisplayKey(session.wtx(), maybe_series->id, chapter_name);
   if(!maybe_chapter) {
     event.edit_original_response(dpp::message("Chapter **" + chapter_name + "** does not exist in **" + series_name + "**."));
+    return;
+  }
+
+  if(maybe_chapter->status != ChapterStatus::in_progress && maybe_chapter->status != ChapterStatus::queued) {
+    event.edit_original_response(dpp::message(
+        "Chapter **" + chapter_name + "** is not in progress or queued. Set its status to In Progress or Queued before modifying assignments."));
     return;
   }
 

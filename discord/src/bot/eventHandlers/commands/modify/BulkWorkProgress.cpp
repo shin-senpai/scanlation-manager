@@ -165,7 +165,7 @@ void Commands::bulkWorkProgress(Bot &bot, const dpp::slashcommand_t &event) {
     // Phase 2: mark all complete and collect pings
     // task_name → set of discord IDs to ping (deduplicated across chapters)
     std::map<std::string, std::set<int64_t>> pings_by_task;
-    std::vector<int> chapters_to_release;
+    std::vector<ChapterEntry> chapters_to_release;
 
     for(const auto &ch : valid_chapters) {
       assignments_repo.setCompleted(session.wtx(), resolved_user_id, ch.id, maybe_task->id);
@@ -178,12 +178,16 @@ void Commands::bulkWorkProgress(Bot &bot, const dpp::slashcommand_t &event) {
       ChapterAssignmentPlaceholdersRepository placeholder_repo;
       if(assignments_repo.listByChapter(session.wtx(), ch.id, std::nullopt, false).empty()
          && !placeholder_repo.existsForChapter(session.wtx(), ch.id)) {
-        chapters_to_release.push_back(ch.id);
+        chapters_to_release.push_back(ch);
       }
     }
 
-    for(const int chapter_id : chapters_to_release) {
-      chapters_repo.updateStatus(session.wtx(), chapter_id, ChapterStatus::released);
+    for(const auto &released_ch : chapters_to_release) {
+      chapters_repo.updateStatus(session.wtx(), released_ch.id, ChapterStatus::released);
+      const auto next_queued_id = chapters_repo.findNextQueuedId(session.wtx(), maybe_series->id, released_ch.number);
+      if(next_queued_id) {
+        chapters_repo.updateStatus(session.wtx(), *next_queued_id, ChapterStatus::in_progress);
+      }
     }
 
     session.commit();

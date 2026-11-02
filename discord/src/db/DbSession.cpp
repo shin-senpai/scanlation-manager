@@ -9,6 +9,7 @@ DbSession::DbSession(ConnectionPool &pool)
       m_conn(pool.acquire()) {}
 
 DbSession::~DbSession() {
+  closeTx();
   m_pool.release(std::move(m_conn));
 }
 
